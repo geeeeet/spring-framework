@@ -22,6 +22,7 @@ import org.springframework.lang.Nullable;
 
 /**
  * The root interface for accessing a Spring bean container.
+ * 用于访问 Spring bean容器的根接口。
  *
  * <p>This is the basic client view of a bean container;
  * further interfaces such as {@link ListableBeanFactory} and
@@ -66,6 +67,7 @@ import org.springframework.lang.Nullable;
  *
  * <p>Bean factory implementations should support the standard bean lifecycle interfaces
  * as far as possible. The full set of initialization methods and their standard order is:
+ * Bean factory的实现应该尽可能的支持标准的bean生命周期，所有的初始化方法和他们的顺序如下：
  * <ol>
  * <li>BeanNameAware's {@code setBeanName}
  * <li>BeanClassLoaderAware's {@code setBeanClassLoader}

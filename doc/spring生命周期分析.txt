@@ -1,0 +1,32 @@
+
+org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean
+
+填充属性值
+org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean 
+
+初始化
+org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#initializeBean(java.lang.String, java.lang.Object, org.springframework.beans.factory.support.RootBeanDefinition)
+  调用aware接口
+  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeAwareMethods
+  
+  调用BeanPostProcessor#postProcessBeforeInitialization
+  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#applyBeanPostProcessorsBeforeInitialization
+      org.springframework.context.support.ApplicationContextAwareProcessor#postProcessBeforeInitialization
+	      org.springframework.context.support.ApplicationContextAwareProcessor#invokeAwareInterfaces
+  
+  
+  如果bean实现了InitializingBean接口，Spring将调用它们的after-PropertiesSet()方法。类似地，如果bean使用init-method声明了初始化方法，该方法也会被调用；
+  org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#invokeInitMethods
+  
+  调用BeanPostProcessor#postProcessAfterInitialization
+  org.springframework.beans.factory.config.BeanPostProcessor#postProcessAfterInitialization
+  
+如果bean实现了DisposableBean接口，Spring将调用它的destroy()接口方法。同样，如果bean使用destroy-method声明了销毁方法，该方法也会被调用。
+org.springframework.beans.factory.support.AbstractBeanFactory#registerDisposableBeanIfNecessary
+
+将bean实例放入一级缓存中
+org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#addSingleton
+
+
+缓存
+org.springframework.beans.factory.support.DefaultSingletonBeanRegistry
