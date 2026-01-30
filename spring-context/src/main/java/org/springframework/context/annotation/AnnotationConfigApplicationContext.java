@@ -56,8 +56,9 @@ import org.springframework.util.Assert;
  */
 public class AnnotationConfigApplicationContext extends GenericApplicationContext implements AnnotationConfigRegistry {
 
+	// 这个类组件用于读取和注册 @Configuration、@Component 等注解的类，他的参数是类，可传入多个或者数组，比如 MyClass.clss
 	private final AnnotatedBeanDefinitionReader reader;
-
+	// 这个类组件则从也是查找组件类，但是它是从包中扫描,传入的参数是包名，比如 "org.springframework.context.annotation"
 	private final ClassPathBeanDefinitionScanner scanner;
 
 
