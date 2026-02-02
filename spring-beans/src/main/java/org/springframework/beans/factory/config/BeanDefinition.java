@@ -24,6 +24,12 @@ import org.springframework.core.AttributeAccessor;
 import org.springframework.core.ResolvableType;
 
 /**
+ * 这是一个定义bean的接口，非常重要，它描述了一个bean有哪些属性值、构造函数参数值以及其他信息。
+ * 这个接口的主要作用是封装bean的元数据，比如bean的属性值、构造函数参数值以及其他信息。
+ * bean的创建根据这里的描述来，后续也好让BeanFactoryPostProcessor进行修改。
+ */
+
+/**
  * A BeanDefinition describes a bean instance, which has property values,
  * constructor argument values, and further information supplied by
  * concrete implementations.
@@ -41,6 +47,7 @@ import org.springframework.core.ResolvableType;
  */
 public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 
+	// bean的范围：singleton
 	/**
 	 * Scope identifier for the standard singleton scope: {@value}.
 	 * <p>Note that extended bean factories might support further scopes.
@@ -49,6 +56,7 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 	 */
 	String SCOPE_SINGLETON = ConfigurableBeanFactory.SCOPE_SINGLETON;
 
+	// bean的范围：prototype
 	/**
 	 * Scope identifier for the standard prototype scope: {@value}.
 	 * <p>Note that extended bean factories might support further scopes.
@@ -58,12 +66,15 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 	String SCOPE_PROTOTYPE = ConfigurableBeanFactory.SCOPE_PROTOTYPE;
 
 
+	// ROLE_APPLICATION = 0 表示这个 Bean 是应用程序的主要组成部分，通常是由用户自定义的 Bean。
+	// 这种角色提示可以帮助开发者或工具在分析配置时快速区分不同类型的 Bean。
 	/**
 	 * Role hint indicating that a {@code BeanDefinition} is a major part
 	 * of the application. Typically corresponds to a user-defined bean.
 	 */
 	int ROLE_APPLICATION = 0;
 
+	// 表示支持性组件，是辅助性的 Bean,通常是ComponentDefinition的一部分。
 	/**
 	 * Role hint indicating that a {@code BeanDefinition} is a supporting
 	 * part of some larger configuration, typically an outer
@@ -75,6 +86,7 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 	 */
 	int ROLE_SUPPORT = 1;
 
+	// 表示基础设施级别的 Bean，与用户业务逻辑无关。
 	/**
 	 * Role hint indicating that a {@code BeanDefinition} is providing an
 	 * entirely background role and has no relevance to the end-user. This hint is
@@ -86,11 +98,13 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 
 	// Modifiable attributes
 
+	// 设置定义该bean的父定义名称，如果有的话。
 	/**
 	 * Set the name of the parent definition of this bean definition, if any.
 	 */
 	void setParentName(@Nullable String parentName);
 
+	// 获取定义该bean的父定义的名称，如果有的话。
 	/**
 	 * Return the name of the parent definition of this bean definition, if any.
 	 */

@@ -120,6 +120,7 @@ public class GenericApplicationContext extends AbstractApplicationContext implem
 	 * @see #refresh
 	 */
 	public GenericApplicationContext() {
+		// 使用默认的DefaultListableBeanFactory创建bean
 		this.beanFactory = new DefaultListableBeanFactory();
 	}
 
@@ -130,6 +131,7 @@ public class GenericApplicationContext extends AbstractApplicationContext implem
 	 * @see #refresh
 	 */
 	public GenericApplicationContext(DefaultListableBeanFactory beanFactory) {
+		// 使用自定义的BeanFactory实现类创建bean,但这个实现类必须是DefaultListableBeanFactory的子类
 		Assert.notNull(beanFactory, "BeanFactory must not be null");
 		this.beanFactory = beanFactory;
 	}

@@ -234,6 +234,7 @@ public class AnnotatedBeanDefinitionReader {
 		doRegisterBean(beanClass, name, null, supplier, customizers);
 	}
 
+	// AnnotatedBeanDefinitionReader的核心注册bean的方法
 	/**
 	 * Register a bean from the given bean class, deriving its metadata from
 	 * class-declared annotations.
@@ -251,7 +252,9 @@ public class AnnotatedBeanDefinitionReader {
 			Class<? extends Annotation> @Nullable [] qualifiers, @Nullable Supplier<T> supplier,
 			BeanDefinitionCustomizer @Nullable [] customizers) {
 
+		// 创建一个AnnotatedGenericBeanDefinition，用来封装bean的元数据，它能够从注解中获取bean元数据
 		AnnotatedGenericBeanDefinition abd = new AnnotatedGenericBeanDefinition(beanClass);
+		// 评估是否可以跳过该bean的注册
 		if (this.conditionEvaluator.shouldSkip(abd.getMetadata())) {
 			return;
 		}
@@ -262,7 +265,9 @@ public class AnnotatedBeanDefinitionReader {
 		abd.setScope(scopeMetadata.getScopeName());
 		String beanName = (name != null ? name : this.beanNameGenerator.generateBeanName(abd, this.registry));
 
+		// 该方法处理公共的注解，比如@Lazy、@Primary、@Fallback、@Scope、@DependsOn、@Role、@Description
 		AnnotationConfigUtils.processCommonDefinitionAnnotations(abd);
+		// qualifiers表示额外的注解，一般是自定义的注解，if中是处理过程
 		if (qualifiers != null) {
 			for (Class<? extends Annotation> qualifier : qualifiers) {
 				if (Primary.class == qualifier) {
@@ -279,12 +284,15 @@ public class AnnotatedBeanDefinitionReader {
 				}
 			}
 		}
+
+		// 这里可以自定义BeanDefinition，比如自定义的Scope、lazy-init等
 		if (customizers != null) {
 			for (BeanDefinitionCustomizer customizer : customizers) {
 				customizer.customize(abd);
 			}
 		}
 
+		// 封装为一个BeanDefinitionHolder并注册到BeanDefinitionRegistry中
 		BeanDefinitionHolder definitionHolder = new BeanDefinitionHolder(abd, beanName);
 		definitionHolder = AnnotationConfigUtils.applyScopedProxyMode(scopeMetadata, definitionHolder, this.registry);
 		BeanDefinitionReaderUtils.registerBeanDefinition(definitionHolder, this.registry);

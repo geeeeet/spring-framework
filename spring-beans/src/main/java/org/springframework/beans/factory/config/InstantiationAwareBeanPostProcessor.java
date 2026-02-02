@@ -22,6 +22,15 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.PropertyValues;
 
 /**
+ * InstantiationAWareBeanPostProcessor这个接口继承了BeanPostProcessor接口，
+ * 它虽然继承BeanPostProcessor接口，但是它并不是一个普通的BeanPostProcessor，而是用来
+ * 实例化bean的，而不是bean初始化前后处理。
+ * 新增两个方法：postProcessBeforeInstantiation和postProcessAfterInstantiation。
+ * 它的作用是限制生成默认的bean实例，转而生成代理对象，自定义实例。比如连接池对象，懒加载对象等。
+ *
+ */
+
+/**
  * Subinterface of {@link BeanPostProcessor} that adds a before-instantiation callback,
  * and a callback after instantiation but before explicit properties are set or
  * autowiring occurs.
@@ -43,6 +52,18 @@ import org.springframework.beans.PropertyValues;
  */
 public interface InstantiationAwareBeanPostProcessor extends BeanPostProcessor {
 
+	/**
+	 * 该方法在创建bean之前被调用，也就是它可以决定要不要生成bean对象或者生成什么样（代理对象）的bean对象。
+	 * 它可以生成一个代理对象代替默认生成的对象。
+	 * 如果返回null，则使用默认的生成bean对象的方式生成bean对象；
+	 * 如果返回不是null，则使用该方法生成的代理对象。但是创建bean的进程会被中断，后续只能执行BeanPostProcessor回调
+	 * 的postProcessAfterInitialization方法进行处理。
+	 * 典型的懒加载，连接池等应用，或者是一些属性额外的注入操作。
+	 *
+	 * 这个方法很强大，也很危险，处理不好可能无法生成bean对象，
+	 * 默认返回null，即使用常规方式生成bean对象。
+	 *
+	 */
 	/**
 	 * Apply this BeanPostProcessor <i>before the target bean gets instantiated</i>.
 	 * The returned bean object may be a proxy to use instead of the target bean,
@@ -72,6 +93,14 @@ public interface InstantiationAwareBeanPostProcessor extends BeanPostProcessor {
 	}
 
 	/**
+	 * 该方法在构造器或工厂方法创建的bean后，但在属性被填充前被调用。
+	 * 返回true表示继续填充属性，返回false则不填充属性。
+	 * 即该方法可以控制要不要填充属性，如果不填充。则表示bean在半成品时生命就结束了。
+	 * 该方法相对温和，我们可以进行一些判断是否符合预期，决定要不要填充属性以完成bean的后续生命周期操作。
+	 * 不建议使用该方法，可以使用下面postProcessProperties方法代替。不过postProcessProperties方法
+	 * 是Spring5.1引入的，之前版本也只能使用postProcessBeforeInstantiation方法。
+	 */
+	/**
 	 * Perform operations after the bean has been instantiated, via a constructor or factory method,
 	 * but before Spring property population (from explicit properties or autowiring) occurs.
 	 * <p>This is the ideal callback for performing custom field injection on the given bean
@@ -90,6 +119,16 @@ public interface InstantiationAwareBeanPostProcessor extends BeanPostProcessor {
 		return true;
 	}
 
+
+	/**
+	 * 在工厂将属性值应用于给定的bean之前，对属性值进行一些处理。
+	 * 该方法比较灵活，可以决定哪些属性可以填充哪些不能，哪些需要修改等等。
+	 *
+	 * @param pvs 工厂即将应用的属性值（永远不会为null），默认直接返回pvs
+	 * @param bean 已创建但尚未设置属性的bean实例
+	 * @param beanName bean的名称
+	 * @return 要应用于给定bean的实际属性值（可以是传入的PropertyValues实例），或null以跳过属性填充
+	 */
 	/**
 	 * Post-process the given property values before the factory applies them
 	 * to the given bean.

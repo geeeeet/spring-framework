@@ -21,6 +21,12 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.BeansException;
 
 /**
+ * 这个后置处理器接口，是非常重要核心扩展点，执行工厂会钩子会回调这个接口的方法
+ * 该接口提供了两个方法，允许bean对象在初始化前后和初始化后进行修改。
+ *
+ */
+
+/**
  * Factory hook that allows for custom modification of new bean instances &mdash;
  * for example, checking for marker interfaces or wrapping beans with proxies.
  *
@@ -59,6 +65,9 @@ import org.springframework.beans.BeansException;
 public interface BeanPostProcessor {
 
 	/**
+	 * 该方法是在bean初始化之前执行，也就是@PostConstruct注解的方法、在调用InitializingBean的afterPropertiesSet方法或者自定义的 init-method 初始化方法之前执行
+	 * 该方法默认返回原始的bean或者被包装后的bean，当然这个bean的属性都是已经填充好了。
+	/**
 	 * Apply this {@code BeanPostProcessor} to the given new bean instance <i>before</i> any bean
 	 * initialization callbacks (like InitializingBean's {@code afterPropertiesSet}
 	 * or a custom init-method). The bean will already be populated with property values.
@@ -75,6 +84,10 @@ public interface BeanPostProcessor {
 		return bean;
 	}
 
+	/**
+	 * 该方法是在bean初始化之后执行，也就是@PreDestroy注解的方法、在调用DisposableBean的destroy方法或者自定义的 destroy-method 销毁方法之后执行
+	 * 该方法默认返回原始的bean或者被包装后的bean，当然这个bean的属性都是已经填充好了。
+	 */
 	/**
 	 * Apply this {@code BeanPostProcessor} to the given new bean instance <i>after</i> any bean
 	 * initialization callbacks (like InitializingBean's {@code afterPropertiesSet}
