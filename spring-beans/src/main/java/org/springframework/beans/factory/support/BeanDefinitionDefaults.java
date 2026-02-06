@@ -21,6 +21,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
+ * Bean定义的默认定义
+ */
+
+/**
  * A simple holder for {@code BeanDefinition} property defaults.
  *
  * @author Mark Fisher

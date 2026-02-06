@@ -187,6 +187,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	/** Map from dependency type to corresponding autowired value. */
 	private final Map<Class<?>, Object> resolvableDependencies = new ConcurrentHashMap<>(16);
 
+	// 缓存bean定义对象，key是bean名称
 	/** Map of bean definition objects, keyed by bean name. */
 	private final Map<String, BeanDefinition> beanDefinitionMap = new ConcurrentHashMap<>(256);
 
@@ -202,6 +203,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	/** Map of singleton-only bean names, keyed by dependency type. */
 	private final Map<Class<?>, String[]> singletonBeanNamesByType = new ConcurrentHashMap<>(64);
 
+	// bean定义名称列表
 	/** List of bean definition names, in registration order. */
 	private volatile List<String> beanDefinitionNames = new ArrayList<>(256);
 
@@ -211,9 +213,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	/** Cached array of bean definition names in case of frozen configuration. */
 	private volatile String @Nullable [] frozenBeanDefinitionNames;
 
+	// 一个标志，表示是否冻结配置，也就是不允许再修改bean定义了
 	/** Whether bean definition metadata may be cached for all beans. */
 	private volatile boolean configurationFrozen;
 
+	// 主线程名称前缀：仅在预实例化阶段设置。
 	/** Name prefix of main thread: only set during pre-instantiation phase. */
 	private volatile @Nullable String mainThreadPrefix;
 
@@ -1098,6 +1102,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		this.mainThreadPrefix = getThreadNamePrefix();
 	}
 
+	/**
+	 * 这是非常重要的方法，会触发所有非懒加载单例 Bean 的初始化。
+	 * DefaultListableBeanFactory实现了这个方法
+	 * @throws BeansException
+	 */
 	@Override
 	public void preInstantiateSingletons() throws BeansException {
 		if (logger.isTraceEnabled()) {
@@ -1115,8 +1124,11 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 		try {
 			List<CompletableFuture<?>> futures = new ArrayList<>();
+			// 遍历bean定义名称，对bean进行实例化和初始化
 			for (String beanName : beanNames) {
+				// 获取合并后最终可用的Bean定义
 				RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
+				// 如果不是抽象的而且是单例的，则进行实例化和初始化
 				if (!mbd.isAbstract() && mbd.isSingleton()) {
 					CompletableFuture<?> future = preInstantiateSingleton(beanName, mbd);
 					if (future != null) {
@@ -1150,18 +1162,46 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 	}
 
+	/**
+	 *
+	 * @param beanName
+	 * @param mbd
+	 * @return
+	 */
 	private @Nullable CompletableFuture<?> preInstantiateSingleton(String beanName, RootBeanDefinition mbd) {
+		// 判断是否标志为可后台初始化，即是否声明了 @Bean(bootstrap = BACKGROUND) 或 xml bootstrap="background"
 		if (mbd.isBackgroundInit()) {
+			/**
+			 * 容器级别的后台线程池（默认没有，需要用户配）
+			 * 示例代码：
+			 * @Bean
+			 * public TaskExecutor bootstrapExecutor() {
+			 *     ThreadPoolTaskExecutor exe = new ThreadPoolTaskExecutor();
+			 *     exe.setCorePoolSize(4);
+			 *     exe.setMaxPoolSize(8);
+			 *     exe.setThreadNamePrefix("spring-bootstrap-");
+			 *     exe.initialize();
+			 *     return exe;
+			 * }
+			 */
 			Executor executor = getBootstrapExecutor();
 			if (executor != null) {
+				// 判断当前的bean是否有依赖bean，如果有则先在主线程同步实例化和初始化这些bean，
+				// 这里使用主线程的目的是保持依赖顺序正确，避免了循环依赖，顺序混乱的问题
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
 					for (String dep : dependsOn) {
-						getBean(dep);
+						getBean(dep); // 同步阻塞，确保依赖先创建好
 					}
 				}
+
+				// 提交一个异步任务，在后台异步创建这个bean
 				CompletableFuture<?> future = CompletableFuture.runAsync(
 						() -> instantiateSingletonInBackgroundThread(beanName), executor);
+
+				// 注册一个“伪工厂”到单例缓存中（关键设计！）
+				// 后续任何人 getBean() 这个 bean 时，会拿到这个 lambda
+				// lambda 内部调用 future.join() → 阻塞等待后台线程完成
 				addSingletonFactory(beanName, () -> {
 					try {
 						future.join();
@@ -1169,21 +1209,26 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 					catch (CompletionException ex) {
 						ReflectionUtils.rethrowRuntimeException(ex.getCause());
 					}
+					// 故意返回 future（类型不匹配时会抛 ClassCastException，防止误用）
 					return future;  // not to be exposed, just to lead to ClassCastException in case of mismatch
 				});
+				// 如果不是 lazy-init，返回 future（但实际基本没人拿到这个返回值）
 				return (!mbd.isLazyInit() ? future : null);
-			}
+			} // 如果没有线程池的话，则直接使用主线程进行实例化和初始化,打印一个日志
 			else if (logger.isInfoEnabled()) {
 				logger.info("Bean '" + beanName + "' marked for background initialization " +
 						"without bootstrap executor configured - falling back to mainline initialization");
 			}
 		}
 
+		// 普通非后台初始化的非懒加载单例处理
 		if (!mbd.isLazyInit()) {
 			try {
 				instantiateSingleton(beanName);
 			}
 			catch (BeanCurrentlyInCreationException ex) {
+				// 允许其他线程（比如另一个后台线程）创建，如果已经开始创建了，主线程就跳过
+				// 这是并发安全的体现
 				logger.info("Bean '" + beanName + "' marked for pre-instantiation (not lazy-init) " +
 						"but currently initialized by other thread - skipping it in mainline thread");
 			}

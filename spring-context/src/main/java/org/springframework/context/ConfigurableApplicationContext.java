@@ -65,6 +65,11 @@ public interface ConfigurableApplicationContext extends ApplicationContext, Life
 	String BOOTSTRAP_EXECUTOR_BEAN_NAME = "bootstrapExecutor";
 
 	/**
+	 * 用于类型转换的bean名称: conversionService
+	 * <p>如果没有提供，则应用默认的转换规则。
+	 * @since 3.0
+	 */
+	/**
 	 * Name of the {@code ConversionService} bean in the factory: {@value}.
 	 * <p>If none is supplied, default conversion rules apply.
 	 * @since 3.0

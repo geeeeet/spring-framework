@@ -146,6 +146,9 @@ public interface ConfigurableBeanFactory extends HierarchicalBeanFactory, Single
 	@Nullable BeanExpressionResolver getBeanExpressionResolver();
 
 	/**
+	 * 启动执行器，用于后台启动
+	 */
+	/**
 	 * Set the {@link Executor} (possibly a {@link org.springframework.core.task.TaskExecutor})
 	 * for background bootstrapping.
 	 * @since 6.2

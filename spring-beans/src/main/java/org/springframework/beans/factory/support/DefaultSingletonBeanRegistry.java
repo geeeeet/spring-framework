@@ -82,21 +82,34 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/** Common lock for singleton creation. */
 	final Lock singletonLock = new ReentrantLock();
 
+	/**
+	 * 一级缓存，完全初始化好的成品 bean（最终版），在初始化完成后放入，getBean() 正常可以获取成品时从这里拿。
+	 */
 	/** Cache of singleton objects: bean name to bean instance. */
 	private final Map<String, Object> singletonObjects = new ConcurrentHashMap<>(256);
 
+	/**
+	 * 三级缓存，存入的对象是可以返回bean早期引用的单例工厂，调用addSingletonFactory() 放进去
+	 * getSingleton() 发现一级二级都没有时，从三级取工厂 → 调用 getObject() → 得到早期 bean
+	 */
 	/** Creation-time registry of singleton factories: bean name to ObjectFactory. */
 	private final Map<String, ObjectFactory<?>> singletonFactories = new ConcurrentHashMap<>(16);
 
 	/** Custom callbacks for singleton creation/registration. */
 	private final Map<String, Consumer<Object>> singletonCallbacks = new ConcurrentHashMap<>(16);
 
+	/**
+	 * 二级缓存，存放早期 bean 引用（半成品），当 getSingleton() 发现一级缓存没有时，会从这里拿。
+	 * 早期暴露的半成品 bean（原始实例），从三级缓存 getObject() 后移入二级
+	 * 解决循环时优先查二级，避免重复创建
+	 */
 	/** Cache of early singleton objects: bean name to bean instance. */
 	private final Map<String, Object> earlySingletonObjects = new ConcurrentHashMap<>(16);
 
 	/** Set of registered singletons, containing the bean names in registration order. */
 	private final Set<String> registeredSingletons = Collections.synchronizedSet(new LinkedHashSet<>(256));
 
+	// 当前正在创建的bean名称集合
 	/** Names of beans that are currently in creation. */
 	private final Set<String> singletonsCurrentlyInCreation = ConcurrentHashMap.newKeySet(16);
 
@@ -173,6 +186,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	}
 
 	/**
+	 * 把一个“能随时生成早期 bean 引用（通常是原始实例）的工厂”放到三级缓存中，允许其他 bean 在当前 bean 还没完成属性填充和初始化的情况下，
+	 * 先拿到它的半成品引用，从而打破循环依赖的死锁。
+	 *
+	 */
+	/**
 	 * Add the given singleton factory for building the specified singleton
 	 * if necessary.
 	 * <p>To be called for early exposure purposes, for example, to be able to
@@ -198,6 +216,12 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	}
 
 	/**
+	 * 从单例缓存中获取指定名称的 bean 实例（成品或半成品），支持在循环依赖场景下返回“早期引用”（early reference），从而解决循环依赖问题。
+	 * 这个方法是整个 Spring 依赖注入（DI）和循环依赖机制的“心脏”入口，几乎所有 getBean() 最终都会走到这里。
+	 * @param beanName
+	 * @param allowEarlyReference 是否开启循环依赖解决机制，正确的理解是“是否允许获取早期引用”
+	 */
+	/**
 	 * Return the (raw) singleton object registered under the given name.
 	 * <p>Checks already instantiated singletons and also allows for an early
 	 * reference to a currently created singleton (resolving a circular reference).
@@ -207,24 +231,53 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	 */
 	protected @Nullable Object getSingleton(String beanName, boolean allowEarlyReference) {
 		// Quick check for existing instance without full singleton lock.
+		// 第一步：从一级缓存中获取bean，即先尝试获取成品bean
 		Object singletonObject = this.singletonObjects.get(beanName);
+		// 如果一级缓存中没有并且当前bean正在创建中，则尝试从二级缓存中获取半成品bean
 		if (singletonObject == null && isSingletonCurrentlyInCreation(beanName)) {
+			// 第二步：从二级缓存中获取半成品bean
 			singletonObject = this.earlySingletonObjects.get(beanName);
+			// 如果二级缓存中没有并且允许循环依赖解决方案，则尝试从三级缓存中获取半成品bean
+			/**
+			 * 插入一个问题：
+			 * allowEarlyReference参数的意思是允许获取半成品bean，即允许循环依赖解决方案。
+			 * 按理论上说，如果allowEarlyReference=false，说明不允许循环依赖解决方案，即earlySingletonObjects
+			 * 查到的bean永远为null，也就是说可以把allowEarlyReference的判断移到earlySingletonObjects.get(beanName)
+			 * 前面而不用多查一次earlySingletonObjects，如果我们自己写的代码设置了allowEarlyReference=false，那么这个思路是可以的，
+			 * 但是对于Spring框架来说，会存在多次调用getSingleton()的情况，会有一些转场，即Spring 内部大量用 getSingleton(beanName, false) 来“只拿已存在的早期对象，
+			 * 但不生成新的”。
+			 * allowEarlyReference正确的语义是是否允许创建bean的早期引用，粗糙的可以认为是否支持循环依赖解决方案。
+			 */
 			if (singletonObject == null && allowEarlyReference) {
+				// 尝试获取可重入锁，获取不到直接返回null，避免死锁
+				// 之前的老板本是用synchronized，会阻塞
 				if (!this.singletonLock.tryLock()) {
 					// Avoid early singleton inference outside of original creation thread.
+					// 拿不到锁 → 说明有其他线程正在创建/生成早期引用
+					// 为了避免“非原始创建线程”乱生成早期引用 → 直接返回 null
+					// （防止并发场景下多个线程同时生成不同代理对象）
 					return null;
 				}
 				try {
 					// Consistent creation of early reference within full singleton lock.
+					// 第三步：当获取到锁后，再尝试从一级和二级缓存获取一次，这是双重校验，防止在获取锁的过程中，其他获得锁的线程已经把bean创建完成了。
 					singletonObject = this.singletonObjects.get(beanName);
 					if (singletonObject == null) {
 						singletonObject = this.earlySingletonObjects.get(beanName);
 						if (singletonObject == null) {
+							// 第四步：一二级缓存都拿不到bean，则尝试从三级缓存中获取，不过此时拿到的是一个半成品bean工厂ObjectFactory
 							ObjectFactory<?> singletonFactory = this.singletonFactories.get(beanName);
+							// 如果能够拿到ObjectFactory工厂
 							if (singletonFactory != null) {
+								// 调用工厂getObject方法，获取半成品bean
 								singletonObject = singletonFactory.getObject();
 								// Singleton could have been added or removed in the meantime.
+								/**
+								 * 将半成品bean工厂从三级缓存中移除，如果成功，则将半成品bean放入二级缓存中
+								 * 如果删除返回null，证明该即该步骤工作已经被其他线程完成了，直接从一级缓存获取成品bean即可
+								 * 该步骤没有看到三级缓存的存放的逻辑，是因为前面的预实例化方法preInstantiateSingleton已经调用
+								 * addSingletonFactory方法put进去了
+								 */
 								if (this.singletonFactories.remove(beanName) != null) {
 									this.earlySingletonObjects.put(beanName, singletonObject);
 								}
@@ -236,6 +289,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					}
 				}
 				finally {
+					// 释放锁
 					this.singletonLock.unlock();
 				}
 			}
@@ -441,6 +495,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		return false;
 	}
 
+	// 确定当前线程是否允许持有单例锁
 	/**
 	 * Determine whether the current thread is allowed to hold the singleton lock.
 	 * <p>By default, all threads are forced to hold a full lock through {@code null}.
@@ -521,6 +576,10 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		return isSingletonCurrentlyInCreation(beanName);
 	}
 
+	/**
+	 * 返回指定的单例 bean 当前是否正在创建中
+	 * （在整个工厂范围内）。
+	 */
 	/**
 	 * Return whether the specified singleton bean is currently in creation
 	 * (within the entire factory).

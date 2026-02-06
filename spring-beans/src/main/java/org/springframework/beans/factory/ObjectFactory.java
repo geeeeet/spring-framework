@@ -19,6 +19,10 @@ package org.springframework.beans.factory;
 import org.springframework.beans.BeansException;
 
 /**
+ * 该接口定义了一个工厂，该工厂可以在调用时返回一个对象实例（可能是共享的或独立的），
+ */
+
+/**
  * Defines a factory which can return an Object instance
  * (possibly shared or independent) when invoked.
  *

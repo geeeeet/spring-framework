@@ -1136,6 +1136,8 @@ public abstract class AbstractBeanDefinition extends BeanMetadataAttributeAccess
 		this.synthetic = synthetic;
 	}
 
+	// 该方法返回一个布尔值，表示当前的 Bean 定义是否是“合成的”。
+	// “合成的”意味着这个 Bean 定义不是由应用程序显式定义的，而是由 Spring 框架或其他基础设施自动创建的。
 	/**
 	 * Return whether this bean definition is 'synthetic', that is,
 	 * not defined by the application itself.

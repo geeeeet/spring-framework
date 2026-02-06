@@ -305,15 +305,24 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 
 
 	/**
+	 * 	 作用：扫描给定的基础包（basePackage），查找符合条件的候选组件，并返回对应的 BeanDefinition 集合。
+	 * 	 返回值：Set<BeanDefinition>，表示扫描到的所有候选组件的定义。
+	 *
+	 * 	 如果支持组件索引的话，优先使用组件索引，这样能够加速扫描，否则使用基础的包扫描方式。
+	 * 	 返回
+	 */
+	/**
 	 * Scan the component index or class path for candidate components.
 	 * @param basePackage the package to check for annotated classes
 	 * @return a corresponding Set of autodetected bean definitions
 	 */
 	public Set<BeanDefinition> findCandidateComponents(String basePackage) {
 		if (this.componentsIndex != null && indexSupportsIncludeFilters()) {
+			// 如果包已经包含了扫描过的包，则从索引中获取对应的候选组件
 			if (this.componentsIndex.hasScannedPackage(basePackage)) {
 				return addCandidateComponentsFromIndex(this.componentsIndex, basePackage);
 			}
+			// 如果包没有被扫描过，则将包注册到索引中,等待下次使用，此次先使用基础包扫描方式。
 			else {
 				this.componentsIndex.registerScan(basePackage);
 			}
@@ -443,6 +452,12 @@ public class ClassPathScanningCandidateComponentProvider implements EnvironmentC
 		return candidates;
 	}
 
+	/**
+	 * 基础包扫描方式。
+	 * 扫描指定包下的所有类，并判断是否满足条件。
+	 * @param basePackage
+	 * @return
+	 */
 	private Set<BeanDefinition> scanCandidateComponents(String basePackage) {
 		Set<BeanDefinition> candidates = new LinkedHashSet<>();
 		try {

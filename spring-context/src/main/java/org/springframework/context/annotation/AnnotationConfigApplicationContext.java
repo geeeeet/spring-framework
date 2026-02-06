@@ -181,7 +181,7 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	// Implementation of AnnotationConfigRegistry
 	//---------------------------------------------------------------------
 
-	// 注册一个或多个组件类以供处理。注册的含义是将bean的一些信息，如bean的名称，scope等信息登记BeanDefinitionRegistry中，以供实例化及
+	// 注册一个或多个组件类以供处理。注册的含义是将bean的一些信息，如bean的名称，scope等信息登记到BeanDefinitionRegistry中，以供实例化及
 	// 后续使用，注册完成后，必须调用refresh方法，才能完成对bean的创建，刷新上下文。
 	/**
 	 * Register one or more component classes to be processed.
@@ -224,7 +224,8 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	// Adapt superclass registerBean calls to AnnotatedBeanDefinitionReader
 	//---------------------------------------------------------------------
 
-	// 重写父类（GenericApplicationContext ）的registerBean方法为AnnotatedBeanDefinitionReader的registerBean方法
+	// 重写父类（GenericApplicationContext ）的registerBean方法
+	// 转到AnnotatedBeanDefinitionReader的registerBean方法
 	@Override
 	public <T> void registerBean(@Nullable String beanName, Class<T> beanClass,
 			@Nullable Supplier<T> supplier, BeanDefinitionCustomizer... customizers) {

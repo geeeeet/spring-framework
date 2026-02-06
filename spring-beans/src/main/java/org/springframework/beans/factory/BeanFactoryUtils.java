@@ -65,6 +65,7 @@ public abstract class BeanFactoryUtils {
 	private static final Map<String, String> transformedBeanNameCache = new ConcurrentHashMap<>();
 
 
+	// 判断当前bean是否是FactoryBean本身
 	/**
 	 * Return whether the given name is a factory dereference
 	 * (beginning with the factory dereference prefix).

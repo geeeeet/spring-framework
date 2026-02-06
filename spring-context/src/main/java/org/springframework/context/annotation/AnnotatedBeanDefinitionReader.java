@@ -244,6 +244,7 @@ public class AnnotatedBeanDefinitionReader {
 	 * in addition to qualifiers at the bean class level
 	 * @param supplier a callback for creating an instance of the bean
 	 * (may be {@code null})
+	 * 一个回调函数（Supplier），用于自定义创建 Bean 实例的方式。
 	 * @param customizers one or more callbacks for customizing the factory's
 	 * {@link BeanDefinition}, for example, setting a lazy-init or primary flag
 	 * @since 5.0
@@ -260,7 +261,30 @@ public class AnnotatedBeanDefinitionReader {
 		}
 
 		abd.setAttribute(ConfigurationClassUtils.CANDIDATE_ATTRIBUTE, Boolean.TRUE);
+
+		/**
+		 * 常规方式：Spring 自动 new FastPaymentService()
+		 * doRegisterBean(FastPaymentService.class, "fastPayment", null, null, null);
+		 *
+		 * 使用 supplier：完全自定义创建逻辑，这个逻辑在创建bean的时候使用
+		 * doRegisterBean(
+		 *     PaymentService.class,  // 注册的类型是接口
+		 *     "specialPayment",
+		 *     null,
+		 *     () -> {
+		 *         可以做任意复杂逻辑
+		 *         PaymentService impl = new FastPaymentService();
+		 *         可以代理、装饰、条件创建等
+		 *         if (someCondition) {
+		 *             return new LoggingProxy(impl);
+		 *         }
+		 *         return impl;
+		 *     },
+		 *     null
+		 * );
+		 */
 		abd.setInstanceSupplier(supplier);
+
 		ScopeMetadata scopeMetadata = this.scopeMetadataResolver.resolveScopeMetadata(abd);
 		abd.setScope(scopeMetadata.getScopeName());
 		String beanName = (name != null ? name : this.beanNameGenerator.generateBeanName(abd, this.registry));

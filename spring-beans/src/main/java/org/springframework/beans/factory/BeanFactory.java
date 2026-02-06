@@ -122,6 +122,11 @@ import org.springframework.core.ResolvableType;
 public interface BeanFactory {
 
 	/**
+	 * FactoryBean前缀，用于区分工厂bean和普通bean
+	 * FactoryBean是一个特殊的bean，用于创建其他bean，注意它不是BeanFactory
+	 * 一般用于自定义创建复杂对象或者创建第三方库对象，然后创建的对象可以让容器进行管理。
+	 */
+	/**
 	 * Used to dereference a {@link FactoryBean} instance and distinguish it from
 	 * beans <i>created</i> by the FactoryBean. For example, if the bean named
 	 * {@code myJndiObject} is a FactoryBean, getting {@code &myJndiObject}
@@ -130,6 +135,9 @@ public interface BeanFactory {
 	 */
 	String FACTORY_BEAN_PREFIX = "&";
 
+	/**
+	 * FactoryBean前缀
+	 */
 	/**
 	 * Character variant of {@link #FACTORY_BEAN_PREFIX}.
 	 * @since 6.2.6

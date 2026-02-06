@@ -1183,6 +1183,8 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 					"Bean class isn't public, and non-public access not allowed: " + beanClass.getName());
 		}
 
+		// 这里使用AbstractBeanDefinition bean定义中的 instanceSupplier 提供的bean自定义创建bean实例的方法。
+		// 这个instanceSupplier是在bean注册阶段设置进去的
 		if (args == null) {
 			Supplier<?> instanceSupplier = mbd.getInstanceSupplier();
 			if (instanceSupplier != null) {

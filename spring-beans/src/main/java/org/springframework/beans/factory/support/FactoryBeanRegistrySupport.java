@@ -42,6 +42,8 @@ import org.springframework.core.ResolvableType;
  */
 public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanRegistry {
 
+	// 用来缓存由FactoryBean创建的单例对象：key是创建的bean的名称，value是创建的bean对象。
+	// 这是专门针对FactoryBean创建的单例对象做的二级缓存
 	/** Cache of singleton objects created by FactoryBeans: FactoryBean name to object. */
 	private final Map<String, Object> factoryBeanObjectCache = new ConcurrentHashMap<>(16);
 
@@ -108,6 +110,12 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 	}
 
 	/**
+	 * 从FactoryBean获取它创建的单例对象
+	 * @param factory FactoryBean实例
+	 * @param beanName bean的名称
+	 * @param shouldPostProcess 该bean是否需要后置处理
+	 */
+	/**
 	 * Obtain an object to expose from the given FactoryBean.
 	 * @param factory the FactoryBean instance
 	 * @param beanName the name of the bean
@@ -119,6 +127,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 	protected Object getObjectFromFactoryBean(FactoryBean<?> factory, @Nullable Class<?> requiredType,
 			String beanName, boolean shouldPostProcess) {
 
+		// 是单例bean并且一级缓存中存在该bean对象
 		if (factory.isSingleton() && containsSingleton(beanName)) {
 			Boolean lockFlag = isCurrentThreadAllowedToHoldSingletonLock();
 			boolean locked;
@@ -130,11 +139,13 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 				locked = (lockFlag && this.singletonLock.tryLock());
 			}
 			try {
+				// SmartFactoryBean 被认为线程安全 → 不需要 synchronized(factory)
 				if (factory instanceof SmartFactoryBean<?>) {
 					// A SmartFactoryBean may return multiple object types -> do not cache.
 					// Also, a SmartFactoryBean needs to be thread-safe -> no synchronization necessary.
+					// 获取FactoryBean创建的单例对象
 					Object object = doGetObjectFromFactoryBean(factory, requiredType, beanName);
-					if (shouldPostProcess) {
+					if (shouldPostProcess) { // 是否需要做后置处理，如 AOP 代理、Aware 接口回调等
 						object = postProcessObjectFromSingletonFactoryBean(object, beanName, locked);
 					}
 					return object;
@@ -143,12 +154,14 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 					// Defensively synchronize against non-thread-safe FactoryBean.getObject() implementations,
 					// potentially to be called from a background thread while the main thread currently calls
 					// the same getObject() method within the singleton lock.
-					synchronized (factory) {
+					// 普通 FactoryBean（非 Smart，可能不线程安全）
+					synchronized (factory) { // 对 factory 对象本身加锁（对象监视器）
 						Object object = this.factoryBeanObjectCache.get(beanName);
 						if (object == null) {
 							object = doGetObjectFromFactoryBean(factory, requiredType, beanName);
 							// Only post-process and store if not put there already during getObject() call above
 							// (for example, because of circular reference processing triggered by custom getBean calls)
+							// Double-Check：防止递归调用 getBean 导致重复 put
 							Object alreadyThere = this.factoryBeanObjectCache.get(beanName);
 							if (alreadyThere != null) {
 								object = alreadyThere;
@@ -172,6 +185,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 				}
 			}
 		}
+		// 不是单例bean，直接调用getObject()获取
 		else {
 			Object object = doGetObjectFromFactoryBean(factory, requiredType, beanName);
 			if (shouldPostProcess) {
@@ -186,6 +200,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 		}
 	}
 
+	// 从FactoryBean获取它创建的对象
 	/**
 	 * Obtain an object to expose from the given FactoryBean.
 	 * @param factory the FactoryBean instance
@@ -199,6 +214,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 
 		Object object;
 		try {
+			// 调用getObject()获取FactoryBean创建的对象
 			object = (requiredType != null && factory instanceof SmartFactoryBean<?> smartFactoryBean ?
 					smartFactoryBean.getObject(requiredType) : factory.getObject());
 		}
@@ -212,6 +228,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 		// Do not accept a null value for a FactoryBean that's not fully
 		// initialized yet: Many FactoryBeans just return null then.
 		if (object == null) {
+			// 为空后判断是否bean正在创建，是则抛出异常，否则返回NullBean
 			if (isSingletonCurrentlyInCreation(beanName)) {
 				throw new BeanCurrentlyInCreationException(
 						beanName, "FactoryBean which is currently in creation returned null from getObject");

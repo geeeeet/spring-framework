@@ -19,6 +19,10 @@ package org.springframework.core.env;
 import org.jspecify.annotations.Nullable;
 
 /**
+ * 用于解析任何底层来源的属性接口
+ */
+
+/**
  * Interface for resolving properties against any underlying source.
  *
  * @author Chris Beams

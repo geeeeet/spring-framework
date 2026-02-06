@@ -51,6 +51,14 @@ public interface ConfigurableListableBeanFactory
 	void ignoreDependencyType(Class<?> type);
 
 	/**
+	 * 方法名: ignoreDependencyInterface
+	 * 作用: 用于忽略指定的依赖接口，使其在自动装配（autowiring）过程中不被考虑。
+	 * 参数:
+	 * Class<?> ifc: 需要忽略的依赖接口类型。
+	 * 该方法提供了一种机制，用于控制哪些接口不应参与 Spring 的自动装配过程，从而避免不必要的依赖注入行为。
+	 * 默认是只有BeanFactoryAware被忽略，如果需要忽略其他依赖接口，可以多次调用该方法。
+	 */
+	/**
 	 * Ignore the given dependency interface for autowiring.
 	 * <p>This will typically be used by application contexts to register
 	 * dependencies that are resolved in other ways, like BeanFactory through
@@ -63,6 +71,30 @@ public interface ConfigurableListableBeanFactory
 	 */
 	void ignoreDependencyInterface(Class<?> ifc);
 
+	/**
+	 *这个方法是 Spring IoC 容器（BeanFactory / ApplicationContext）里一个非常重要的“后门”功能。它的核心作用一句话概括：
+	 *
+	 *  让某些根本没有注册成 Bean 的特殊对象（比如容器自己、ApplicationContext、BeanFactory 等），也能被 @Autowired
+	 * 、构造函数注入等方式自动注入给其他 Bean。
+	 *
+	 * 为什么需要这个方法？（最常见的痛点）正常情况下，@Autowired
+	 * 只能注入已经注册成 Bean 的东西。但在实际开发中，有些对象非常特殊：
+	 *    1、它们本身就是容器的一部分（比如当前的 ApplicationContext）
+	 *    2、它们不适合也不应该注册成普通的 Bean（因为它们是容器级单例，生命周期和容器绑定）
+	 *    3、但很多业务 Bean 又确实需要拿到它们（比如想动态 getBean、发布事件、读取环境变量等）
+	 *
+	 * autowiredValue 可以是 ObjectFactory（可以延迟加载）
+	 * 比如：
+	 * beanFactory.registerResolvableDependency(DataSource.class,
+	 *     (ObjectFactory<DataSource>) () -> createDataSourceOnDemand());
+	 * 只有真正用到时才会调用 createDataSourceOnDemand() 创建数据源。
+	 *
+	 * 如果没有这个机制，你就只能用 Aware 接口（ApplicationContextAware、BeanFactoryAware）来“被动接收”，而不能用更现代的 @Autowired
+	 *  方式注入。registerResolvableDependency 就是为了解决这个矛盾，让这些“容器原生对象”也能像普通 Bean 一样被 @Autowired。
+	 *
+	 *  该方法与Aware的区别在于，Aware是被动接收，而registerResolvableDependency是主动注入。
+	 *  即Aware 是“推”，这个是“拉”
+	 */
 	/**
 	 * Register a special dependency type with corresponding autowired value.
 	 * <p>This is intended for factory/context references that are supposed

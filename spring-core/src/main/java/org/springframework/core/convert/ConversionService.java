@@ -19,6 +19,10 @@ package org.springframework.core.convert;
 import org.jspecify.annotations.Nullable;
 
 /**
+ * 类型转换服务接口，这是一个入口接口，用于执行线程安全的类型转换。
+ * 调用 {@link #convert(Object, Class)} 方法来执行类型转换。
+ */
+/**
  * A service interface for type conversion. This is the entry point into the convert system.
  * Call {@link #convert(Object, Class)} to perform a thread-safe type conversion using this system.
  *
