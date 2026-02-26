@@ -186,6 +186,68 @@ class SubscriptionMethodReturnValueHandlerTests {
 		assertThat(new String((byte[]) message.getPayload(), StandardCharsets.UTF_8)).isEqualTo("{\"withView1\":\"with\"}");
 	}
 
+	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	void testHeaderFilterSinglePredicate() throws Exception {
+		String sessionId = "sess1";
+		String subscriptionId = "subs1";
+		String destination = "/dest";
+		String headerName = "x-custom-header";
+		String headerValue = "custom-value";
+
+		SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.create();
+		accessor.setSessionId(sessionId);
+		accessor.setSubscriptionId(subscriptionId);
+		accessor.setDestination(destination);
+		accessor.setNativeHeader(headerName, headerValue);
+		Message<?> inputMessage = MessageBuilder.createMessage(PAYLOAD, accessor.getMessageHeaders());
+
+		MessageSendingOperations template = mock();
+		SubscriptionMethodReturnValueHandler handler = new SubscriptionMethodReturnValueHandler(template);
+		handler.addHeaderFilter(name -> name.equals(headerName));
+
+		handler.handleReturnValue(PAYLOAD, this.subscribeEventReturnType, inputMessage);
+
+		ArgumentCaptor<MessageHeaders> captor = ArgumentCaptor.forClass(MessageHeaders.class);
+		verify(template).convertAndSend(eq(destination), eq(PAYLOAD), captor.capture());
+
+		accessor = MessageHeaderAccessor.getAccessor(captor.getValue(), SimpMessageHeaderAccessor.class);
+		assertThat(accessor).isNotNull();
+		assertThat(accessor.getFirstNativeHeader(headerName)).isEqualTo(headerValue);
+	}
+
+	@Test
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	void testHeaderFilterMultiplePredicates() throws Exception {
+		String sessionId = "sess1";
+		String subscriptionId = "subs1";
+		String destination = "/dest";
+		String headerA = "x-header-a";
+		String headerB = "x-header-b";
+
+		SimpMessageHeaderAccessor accessor = SimpMessageHeaderAccessor.create();
+		accessor.setSessionId(sessionId);
+		accessor.setSubscriptionId(subscriptionId);
+		accessor.setDestination(destination);
+		accessor.setNativeHeader(headerA, "A-value");
+		accessor.setNativeHeader(headerB, "B-value");
+		Message<?> inputMessage = MessageBuilder.createMessage(PAYLOAD, accessor.getMessageHeaders());
+
+		MessageSendingOperations template = mock();
+		SubscriptionMethodReturnValueHandler handler = new SubscriptionMethodReturnValueHandler(template);
+		handler.addHeaderFilter(name -> name.equals(headerA));
+		handler.addHeaderFilter(name -> name.equals(headerB));
+
+		handler.handleReturnValue(PAYLOAD, this.subscribeEventReturnType, inputMessage);
+
+		ArgumentCaptor<MessageHeaders> captor = ArgumentCaptor.forClass(MessageHeaders.class);
+		verify(template).convertAndSend(eq(destination), eq(PAYLOAD), captor.capture());
+
+		accessor = MessageHeaderAccessor.getAccessor(captor.getValue(), SimpMessageHeaderAccessor.class);
+		assertThat(accessor).isNotNull();
+		assertThat(accessor.getFirstNativeHeader(headerA)).isEqualTo("A-value");
+		assertThat(accessor.getFirstNativeHeader(headerB)).isEqualTo("B-value");
+	}
 
 	private Message<?> createInputMessage(String sessId, String subsId, String dest, Principal principal) {
 		SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create();

@@ -55,7 +55,7 @@ class MappingJackson2MessageConverterTests {
 	}
 
 	@Test  // SPR-12724
-	public void mimetypeParametrizedConstructor() {
+	void mimetypeParametrizedConstructor() {
 		MimeType mimetype = new MimeType("application", "xml", StandardCharsets.UTF_8);
 		MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter(mimetype);
 		assertThat(converter.getSupportedMimeTypes()).contains(mimetype);
@@ -64,13 +64,29 @@ class MappingJackson2MessageConverterTests {
 	}
 
 	@Test  // SPR-12724
-	public void mimetypesParametrizedConstructor() {
+	void mimetypesParametrizedConstructor() {
 		MimeType jsonMimetype = new MimeType("application", "json", StandardCharsets.UTF_8);
 		MimeType xmlMimetype = new MimeType("application", "xml", StandardCharsets.UTF_8);
 		MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter(jsonMimetype, xmlMimetype);
 		assertThat(converter.getSupportedMimeTypes()).contains(jsonMimetype, xmlMimetype);
 		assertThat(converter.getObjectMapper().getDeserializationConfig()
 				.isEnabled(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)).isFalse();
+	}
+
+	@Test
+	void supportJsonMimeType() {
+		MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
+		Message<String> message = MessageBuilder.withPayload("foo")
+				.setHeader(MessageHeaders.CONTENT_TYPE, "application/json").build();
+		assertThat(converter.supportsMimeType(message.getHeaders())).isTrue();
+	}
+
+	@Test
+	void supportVendorJsonMimeTypes() {
+		MappingJackson2MessageConverter converter = new MappingJackson2MessageConverter();
+		Message<String> message = MessageBuilder.withPayload("foo")
+				.setHeader(MessageHeaders.CONTENT_TYPE, "application/vnd.springframework.type+json").build();
+		assertThat(converter.supportsMimeType(message.getHeaders())).isTrue();
 	}
 
 	@Test

@@ -26,6 +26,7 @@ import jakarta.persistence.spi.PersistenceUnitInfo;
 import jakarta.transaction.TransactionManager;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
+import org.hibernate.StatelessSession;
 import org.hibernate.cfg.AvailableSettings;
 import org.hibernate.dialect.DB2Dialect;
 import org.hibernate.dialect.H2Dialect;
@@ -49,7 +50,7 @@ import org.springframework.transaction.jta.JtaTransactionManager;
 
 /**
  * {@link org.springframework.orm.jpa.JpaVendorAdapter} implementation for Hibernate.
- * Compatible with Hibernate ORM 7.x.
+ * Compatible with Hibernate ORM 7.x and 8.x.
  *
  * <p>Exposes Hibernate's persistence provider and Hibernate's Session as extended
  * EntityManager interface, and adapts {@link AbstractJpaVendorAdapter}'s common
@@ -78,10 +79,6 @@ public class HibernateJpaVendorAdapter extends AbstractJpaVendorAdapter implemen
 
 	private final PersistenceProvider persistenceProvider;
 
-	private final Class<? extends EntityManagerFactory> entityManagerFactoryInterface;
-
-	private final Class<? extends EntityManager> entityManagerInterface;
-
 	private @Nullable Object jtaTransactionManager;
 
 	private @Nullable BeanFactory beanFactory;
@@ -89,8 +86,6 @@ public class HibernateJpaVendorAdapter extends AbstractJpaVendorAdapter implemen
 
 	public HibernateJpaVendorAdapter() {
 		this.persistenceProvider = new SpringHibernateJpaPersistenceProvider();
-		this.entityManagerFactoryInterface = SessionFactory.class;
-		this.entityManagerInterface = Session.class;
 	}
 
 
@@ -271,12 +266,17 @@ public class HibernateJpaVendorAdapter extends AbstractJpaVendorAdapter implemen
 
 	@Override
 	public Class<? extends EntityManagerFactory> getEntityManagerFactoryInterface() {
-		return this.entityManagerFactoryInterface;
+		return SessionFactory.class;
 	}
 
 	@Override
 	public Class<? extends EntityManager> getEntityManagerInterface() {
-		return this.entityManagerInterface;
+		return Session.class;
+	}
+
+	@Override
+	public Class<?> getEntityAgentInterface() {
+		return StatelessSession.class;
 	}
 
 }

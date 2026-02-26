@@ -45,13 +45,13 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 
 /**
- * Helper class that encapsulates the specification of a method parameter, i.e. a {@link Method}
- * or {@link Constructor} plus a parameter index and a nested type index for a declared generic
- * type. Useful as a specification object to pass along.
+ * Helper class that encapsulates the specification of a method parameter: a
+ * {@link Method} or {@link Constructor} plus a parameter index and a nested type
+ * index for a declared generic type. Useful as a specification object to pass along.
  *
- * <p>As of 4.2, there is a {@link org.springframework.core.annotation.SynthesizingMethodParameter}
- * subclass available which synthesizes annotations with attribute aliases. That subclass is used
- * for web and message endpoint processing, in particular.
+ * <p>There is also a {@link org.springframework.core.annotation.SynthesizingMethodParameter}
+ * subclass available which synthesizes annotations with attribute aliases. That
+ * subclass is used for web and message endpoint processing, in particular.
  *
  * @author Juergen Hoeller
  * @author Rob Harrop
@@ -86,6 +86,8 @@ public class MethodParameter {
 	private volatile @Nullable Class<?> parameterType;
 
 	private volatile @Nullable Type genericParameterType;
+
+	private volatile Annotation @Nullable [] methodAnnotations;
 
 	private volatile Annotation @Nullable [] parameterAnnotations;
 
@@ -126,7 +128,8 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Create a new MethodParameter for the given constructor, with nesting level 1.
+	 * Create a new {@code MethodParameter} for the given constructor, with nesting
+	 * level 1.
 	 * @param constructor the Constructor to specify a parameter for
 	 * @param parameterIndex the index of the parameter
 	 */
@@ -135,7 +138,7 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Create a new MethodParameter for the given constructor.
+	 * Create a new {@code MethodParameter} for the given constructor.
 	 * @param constructor the Constructor to specify a parameter for
 	 * @param parameterIndex the index of the parameter
 	 * @param nestingLevel the nesting level of the target type
@@ -150,7 +153,7 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Internal constructor used to create a {@link MethodParameter} with a
+	 * Internal constructor used to create a {@code MethodParameter} with a
 	 * containing class already set.
 	 * @param executable the Executable to specify a parameter for
 	 * @param parameterIndex the index of the parameter
@@ -166,9 +169,9 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Copy constructor, resulting in an independent MethodParameter object
+	 * Copy constructor, resulting in an independent {@code MethodParameter} object
 	 * based on the same metadata and cache state that the original object was in.
-	 * @param original the original MethodParameter object to copy from
+	 * @param original the original {@code MethodParameter} object to copy from
 	 */
 	public MethodParameter(MethodParameter original) {
 		Assert.notNull(original, "Original must not be null");
@@ -180,6 +183,7 @@ public class MethodParameter {
 		this.containingClass = original.containingClass;
 		this.parameterType = original.parameterType;
 		this.genericParameterType = original.genericParameterType;
+		this.methodAnnotations = original.methodAnnotations;
 		this.parameterAnnotations = original.parameterAnnotations;
 		this.parameterNameDiscoverer = original.parameterNameDiscoverer;
 		this.parameterName = original.parameterName;
@@ -277,7 +281,7 @@ public class MethodParameter {
 	/**
 	 * Decrease this parameter's nesting level.
 	 * @see #getNestingLevel()
-	 * @deprecated in favor of retaining the original MethodParameter and
+	 * @deprecated in favor of retaining the original {@code MethodParameter} and
 	 * using {@link #nested(Integer)} if nesting is required
 	 */
 	@Deprecated(since = "5.2")
@@ -390,10 +394,10 @@ public class MethodParameter {
 
 	/**
 	 * Return whether this method indicates a parameter which is not required:
-	 * either in the form of Java 8's {@link java.util.Optional}, JSpecify annotations,
-	 * any variant of a parameter-level {@code @Nullable} annotation (such as from Spring,
-	 * JSR-305 or Jakarta set of annotations), a language-level nullable type
-	 * declaration or {@code Continuation} parameter in Kotlin.
+	 * either in the form of {@link java.util.Optional}, JSpecify annotations,
+	 * any variant of a parameter-level {@code @Nullable} annotation (such as
+	 * from Spring, JSR-305, or Jakarta annotations), or a language-level
+	 * nullable type declaration or {@code Continuation} parameter in Kotlin.
 	 * @since 4.3
 	 * @see Nullness#forMethodParameter(MethodParameter)
 	 */
@@ -584,7 +588,12 @@ public class MethodParameter {
 	 * Return the annotations associated with the target method/constructor itself.
 	 */
 	public Annotation[] getMethodAnnotations() {
-		return adaptAnnotationArray(getAnnotatedElement().getAnnotations());
+		Annotation[] methodAnns = this.methodAnnotations;
+		if (methodAnns == null) {
+			methodAnns = adaptAnnotationArray(getAnnotatedElement().getAnnotations());
+			this.methodAnnotations = methodAnns;
+		}
+		return methodAnns;
 	}
 
 	/**
@@ -592,9 +601,15 @@ public class MethodParameter {
 	 * @param annotationType the annotation type to look for
 	 * @return the annotation object, or {@code null} if not found
 	 */
+	@SuppressWarnings("unchecked")
 	public <A extends Annotation> @Nullable A getMethodAnnotation(Class<A> annotationType) {
-		A annotation = getAnnotatedElement().getAnnotation(annotationType);
-		return (annotation != null ? adaptAnnotation(annotation) : null);
+		Annotation[] anns = getMethodAnnotations();
+		for (Annotation ann : anns) {
+			if (annotationType.isInstance(ann)) {
+				return (A) ann;
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -604,7 +619,7 @@ public class MethodParameter {
 	 * @see #getMethodAnnotation(Class)
 	 */
 	public <A extends Annotation> boolean hasMethodAnnotation(Class<A> annotationType) {
-		return getAnnotatedElement().isAnnotationPresent(annotationType);
+		return (getMethodAnnotation(annotationType) != null);
 	}
 
 	/**
@@ -760,9 +775,9 @@ public class MethodParameter {
 
 
 	/**
-	 * Create a new MethodParameter for the given method or constructor.
-	 * <p>This is a convenience factory method for scenarios where a
-	 * Method or Constructor reference is treated in a generic fashion.
+	 * Create a new {@code MethodParameter} for the given method or constructor.
+	 * <p>This is a convenience factory method for scenarios where a {@link Method}
+	 * or {@link Constructor} reference is treated in a generic fashion.
 	 * @param methodOrConstructor the Method or Constructor to specify a parameter for
 	 * @param parameterIndex the index of the parameter
 	 * @return the corresponding MethodParameter instance
@@ -778,9 +793,9 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Create a new MethodParameter for the given method or constructor.
-	 * <p>This is a convenience factory method for scenarios where a
-	 * Method or Constructor reference is treated in a generic fashion.
+	 * Create a new {@code MethodParameter} for the given method or constructor.
+	 * <p>This is a convenience factory method for scenarios where a {@link Method}
+	 * or {@link Constructor} reference is treated in a generic fashion.
 	 * @param executable the Method or Constructor to specify a parameter for
 	 * @param parameterIndex the index of the parameter
 	 * @return the corresponding MethodParameter instance
@@ -799,11 +814,11 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Create a new MethodParameter for the given parameter descriptor.
-	 * <p>This is a convenience factory method for scenarios where a
-	 * Java 8 {@link Parameter} descriptor is already available.
+	 * Create a new {@code MethodParameter} for the given parameter descriptor.
+	 * <p>This is a convenience factory method for scenarios where a {@link Parameter}
+	 * descriptor is already available.
 	 * @param parameter the parameter descriptor
-	 * @return the corresponding MethodParameter instance
+	 * @return the corresponding {@code MethodParameter} instance
 	 * @since 5.0
 	 */
 	public static MethodParameter forParameter(Parameter parameter) {
@@ -838,7 +853,7 @@ public class MethodParameter {
 	}
 
 	/**
-	 * Create a new MethodParameter for the given field-aware constructor,
+	 * Create a new {@code MethodParameter} for the given field-aware constructor,
 	 * for example, on a data class or record type.
 	 * <p>A field-aware method parameter will detect field annotations as well,
 	 * as long as the field name matches the parameter name.
@@ -846,7 +861,7 @@ public class MethodParameter {
 	 * @param parameterIndex the index of the parameter
 	 * @param fieldName the name of the underlying field,
 	 * matching the constructor's parameter name
-	 * @return the corresponding MethodParameter instance
+	 * @return the corresponding {@code MethodParameter} instance
 	 * @since 6.1
 	 */
 	public static MethodParameter forFieldAwareConstructor(Constructor<?> ctor, int parameterIndex, @Nullable String fieldName) {

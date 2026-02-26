@@ -81,8 +81,6 @@ public class InvocableHandlerMethod extends HandlerMethod {
 
 	private static final Mono<Object[]> EMPTY_ARGS = Mono.just(new Object[0]);
 
-	private static final Class<?>[] EMPTY_GROUPS = new Class<?>[0];
-
 	private static final Object NO_ARG_VALUE = new Object();
 
 	private static final boolean KOTLIN_REFLECT_PRESENT = KotlinDetector.isKotlinReflectPresent();
@@ -95,8 +93,6 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	private ReactiveAdapterRegistry reactiveAdapterRegistry = ReactiveAdapterRegistry.getSharedInstance();
 
 	private @Nullable MethodValidator methodValidator;
-
-	private Class<?>[] validationGroups = EMPTY_GROUPS;
 
 	private @Nullable Scheduler invocationScheduler;
 
@@ -150,7 +146,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	/**
 	 * Configure a reactive adapter registry. This is needed for cases where the response is
 	 * fully handled within the controller in combination with an async void return value.
-	 * <p>By default this is a {@link ReactiveAdapterRegistry} with default settings.
+	 * <p>By default, this is a {@link ReactiveAdapterRegistry} with default settings.
 	 */
 	public void setReactiveAdapterRegistry(ReactiveAdapterRegistry registry) {
 		this.reactiveAdapterRegistry = registry;
@@ -164,8 +160,6 @@ public class InvocableHandlerMethod extends HandlerMethod {
 	 */
 	public void setMethodValidator(@Nullable MethodValidator methodValidator) {
 		this.methodValidator = methodValidator;
-		this.validationGroups = (methodValidator != null ?
-				methodValidator.determineValidationGroups(getBean(), getBridgedMethod()) : EMPTY_GROUPS);
 	}
 
 	/**
@@ -192,7 +186,7 @@ public class InvocableHandlerMethod extends HandlerMethod {
 				try {
 					LocaleContextHolder.setLocaleContext(exchange.getLocaleContext());
 					this.methodValidator.applyArgumentValidation(
-							getBean(), getBridgedMethod(), getMethodParameters(), args, this.validationGroups);
+							getBean(), getBridgedMethod(), getMethodParameters(), args, getValidationGroups());
 				}
 				finally {
 					LocaleContextHolder.resetLocaleContext();

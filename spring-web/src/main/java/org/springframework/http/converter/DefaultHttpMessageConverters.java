@@ -225,12 +225,12 @@ class DefaultHttpMessageConverters implements HttpMessageConverters {
 		}
 
 		void addMessageConverterConfigurer(Consumer<HttpMessageConverter<?>> configurer) {
-			this.configurer = (this.configurer != null) ? configurer.andThen(this.configurer) : configurer;
+			this.configurer = (this.configurer != null) ? this.configurer.andThen(configurer) : configurer;
 		}
 
 		void addMessageConvertersListConfigurer(Consumer<List<HttpMessageConverter<?>>> configurer) {
 			this.convertersListConfigurer = (this.convertersListConfigurer != null) ?
-					this.convertersListConfigurer.andThen(this.convertersListConfigurer) : configurer;
+					this.convertersListConfigurer.andThen(configurer) : configurer;
 		}
 
 		List<HttpMessageConverter<?>> getBaseConverters() {
@@ -390,6 +390,12 @@ class DefaultHttpMessageConverters implements HttpMessageConverters {
 		}
 
 		@Override
+		public ClientBuilder disableDefaults() {
+			this.registerDefaults = false;
+			return this;
+		}
+
+		@Override
 		public ClientBuilder withStringConverter(HttpMessageConverter<?> stringConverter) {
 			setStringConverter(stringConverter);
 			return this;
@@ -492,6 +498,12 @@ class DefaultHttpMessageConverters implements HttpMessageConverters {
 		@Override
 		public ServerBuilder registerDefaults() {
 			this.registerDefaults = true;
+			return this;
+		}
+
+		@Override
+		public ServerBuilder disableDefaults() {
+			this.registerDefaults = false;
 			return this;
 		}
 
