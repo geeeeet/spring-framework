@@ -1236,6 +1236,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		return null;
 	}
 
+	// 后台线程实例化bean
 	private void instantiateSingletonInBackgroundThread(String beanName) {
 		this.preInstantiationThread.set(PreInstantiation.BACKGROUND);
 		try {
@@ -1252,6 +1253,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 	}
 
+	// 根据bean名称实例化bean
 	private void instantiateSingleton(String beanName) {
 		if (isFactoryBean(beanName)) {
 			Object bean = getBean(FACTORY_BEAN_PREFIX + beanName);
@@ -1264,6 +1266,13 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		}
 	}
 
+	/**
+	 * 根据bean名称和类型获取bean
+	 *
+	 * @param beanName
+	 * @param requiredType
+	 * @return
+	 */
 	private Object resolveBean(String beanName, ResolvableType requiredType) {
 		try {
 			// Need to provide required type for SmartFactoryBean
@@ -1286,6 +1295,12 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	// Implementation of BeanDefinitionRegistry interface
 	//---------------------------------------------------------------------
 
+	/**
+	 * 根据bean名称和定义注册bean定义
+	 * @param beanName the name of the bean instance to register
+	 * @param beanDefinition definition of the bean instance to register
+	 * @throws BeanDefinitionStoreException
+	 */
 	@Override
 	public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
 			throws BeanDefinitionStoreException {

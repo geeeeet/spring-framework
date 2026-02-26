@@ -122,6 +122,11 @@ class ConstructorResolver {
 	// BeanWrapper-based construction
 
 	/**
+	 * “根据 bean 定义、显式参数或 autowire 规则，从多个候选构造器中挑选最合适的那个，解析/自动注入所有构造参数，
+	 * 然后用反射调用构造器创建 bean 实例，并返回包装后的 BeanWrapper。”
+	 * 这是 Spring 构造函数注入（尤其是 @Autowired 在构造器上，或 XML/注解配置中 autowire="constructor"）的底层实现。
+	 */
+	/**
 	 * "autowire constructor" (with constructor arguments by type) behavior.
 	 * Also applied if explicit constructor argument values are specified.
 	 * @param beanName the name of the bean
@@ -135,6 +140,8 @@ class ConstructorResolver {
 	public BeanWrapper autowireConstructor(String beanName, RootBeanDefinition mbd,
 			Constructor<?> @Nullable [] chosenCtors, @Nullable Object @Nullable [] explicitArgs) {
 
+		// 第一步：准备 BeanWrapper
+		// 创建 BeanWrapperImpl，初始化属性编辑器、转换服务等（用于后续参数转换）。
 		BeanWrapperImpl bw = new BeanWrapperImpl();
 		this.beanFactory.initBeanWrapper(bw);
 
@@ -142,6 +149,11 @@ class ConstructorResolver {
 		ArgumentsHolder argsHolderToUse = null;
 		@Nullable Object[] argsToUse = null;
 
+		// 第二步：
+		// 尝试使用缓存的构造器 + 参数
+		// 检查 mbd.resolvedConstructorOrFactoryMethod 是否已有缓存的构造器
+		// 如果有且参数已解析，直接复用 resolvedConstructorArguments 或 preparedConstructorArguments
+		// 这是性能优化：同一个 bean 定义第二次创建时直接走缓存
 		if (explicitArgs != null) {
 			argsToUse = explicitArgs;
 		}
@@ -162,12 +174,16 @@ class ConstructorResolver {
 			}
 		}
 
+		// 第三步：如果没有缓存的构造器或参数，则进入完整的解析流程
 		if (constructorToUse == null || argsToUse == null) {
+			// 优先选择显式的构造器
 			// Take specified constructors, if any.
 			Constructor<?>[] candidates = chosenCtors;
 			if (candidates == null) {
 				Class<?> beanClass = mbd.getBeanClass();
 				try {
+					// getDeclaredConstructors()是返回所有的构造器，无论是public修饰还是其他 protected、包访问权限和 private 构造器
+					// getConstructors()只返回 public 修饰的构造器
 					candidates = (mbd.isNonPublicAccessAllowed() ?
 							beanClass.getDeclaredConstructors() : beanClass.getConstructors());
 				}
@@ -178,13 +194,14 @@ class ConstructorResolver {
 				}
 			}
 
+			// 特殊快路径：只有一个无参构造器 + 无显式参数 + 无构造器参数定义 → 直接用无参构造，缓存并返回
 			if (candidates.length == 1 && explicitArgs == null && !mbd.hasConstructorArgumentValues()) {
 				Constructor<?> uniqueCandidate = candidates[0];
 				if (uniqueCandidate.getParameterCount() == 0) {
 					synchronized (mbd.constructorArgumentLock) {
-						mbd.resolvedConstructorOrFactoryMethod = uniqueCandidate;
-						mbd.constructorArgumentsResolved = true;
-						mbd.resolvedConstructorArguments = EMPTY_ARGS;
+						mbd.resolvedConstructorOrFactoryMethod = uniqueCandidate; // 缓存无参构造器
+						mbd.constructorArgumentsResolved = true; // 设置参数已解析
+						mbd.resolvedConstructorArguments = EMPTY_ARGS; // 缓存参数为空
 					}
 					bw.setBeanInstance(instantiate(beanName, mbd, uniqueCandidate, EMPTY_ARGS));
 					return bw;
@@ -196,6 +213,7 @@ class ConstructorResolver {
 					mbd.getResolvedAutowireMode() == AutowireCapableBeanFactory.AUTOWIRE_CONSTRUCTOR);
 			ConstructorArgumentValues resolvedValues = null;
 
+			// 确定最小参数个数
 			int minNrOfArgs;
 			if (explicitArgs != null) {
 				minNrOfArgs = explicitArgs.length;
@@ -206,11 +224,13 @@ class ConstructorResolver {
 				minNrOfArgs = resolveConstructorArguments(beanName, mbd, bw, cargs, resolvedValues);
 			}
 
+			//  按贪婪度排序构造器（AutowireUtils.sortConstructors）,参数多的排前面（贪婪匹配优先）
 			AutowireUtils.sortConstructors(candidates);
 			int minTypeDiffWeight = Integer.MAX_VALUE;
 			Set<Constructor<?>> ambiguousConstructors = null;
 			Deque<UnsatisfiedDependencyException> causes = null;
 
+			// 复杂的逻辑部分，选用哪个构造器创建对象
 			for (Constructor<?> candidate : candidates) {
 				int parameterCount = candidate.getParameterCount();
 

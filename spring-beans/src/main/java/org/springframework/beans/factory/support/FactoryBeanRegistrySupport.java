@@ -98,6 +98,7 @@ public abstract class FactoryBeanRegistrySupport extends DefaultSingletonBeanReg
 		return (type != null ? type.as(FactoryBean.class).getGeneric() : ResolvableType.NONE);
 	}
 
+	// 从缓存factoryBeanObjectCache中获取FactoryBean创建的bean对象
 	/**
 	 * Obtain an object to expose from the given FactoryBean, if available
 	 * in cached form. Quick check for minimal synchronization.

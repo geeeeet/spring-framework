@@ -143,9 +143,11 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	/** Map between containing bean names: bean name to Set of bean names that the bean contains. */
 	private final Map<String, Set<String>> containedBeanMap = new ConcurrentHashMap<>(16);
 
+	// 作用：记录某个 Bean 被哪些其他 Bean 所依赖。即哪些bean依赖该bean
 	/** Map between dependent bean names: bean name to Set of dependent bean names. */
 	private final Map<String, Set<String>> dependentBeanMap = new ConcurrentHashMap<>(64);
 
+	// 作用：记录某个 Bean 依赖了哪些其他 Bean。
 	/** Map between depending bean names: bean name to Set of bean names for the bean's dependencies. */
 	private final Map<String, Set<String>> dependenciesForBeanMap = new ConcurrentHashMap<>(64);
 
@@ -164,20 +166,24 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	}
 
 	/**
+	 * 将成品bean放入一级缓存，删除二、三级缓存
+	 */
+	/**
 	 * Add the given singleton object to the singleton registry.
 	 * <p>To be called for exposure of freshly registered/created singletons.
 	 * @param beanName the name of the bean
 	 * @param singletonObject the singleton object
 	 */
 	protected void addSingleton(String beanName, Object singletonObject) {
+		// 放入一级缓存
 		Object oldObject = this.singletonObjects.putIfAbsent(beanName, singletonObject);
 		if (oldObject != null) {
 			throw new IllegalStateException("Could not register object [" + singletonObject +
 					"] under bean name '" + beanName + "': there is already object [" + oldObject + "] bound");
 		}
-		this.singletonFactories.remove(beanName);
-		this.earlySingletonObjects.remove(beanName);
-		this.registeredSingletons.add(beanName);
+		this.singletonFactories.remove(beanName); // 删除三级缓存
+		this.earlySingletonObjects.remove(beanName); // 删除二级缓存
+		this.registeredSingletons.add(beanName); // 添加到已注册的bean名称集合中
 
 		Consumer<Object> callback = this.singletonCallbacks.get(beanName);
 		if (callback != null) {
@@ -298,6 +304,9 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	}
 
 	/**
+	 * 获取单例bean，如果没有，则创建并注册一个单例bean
+	 */
+	/**
 	 * Return the (raw) singleton object registered under the given name,
 	 * creating and registering a new one if none registered yet.
 	 * @param beanName the name of the bean
@@ -315,6 +324,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		boolean locked = (acquireLock && this.singletonLock.tryLock());
 
 		try {
+			// 从一级缓存查询
 			Object singletonObject = this.singletonObjects.get(beanName);
 			if (singletonObject == null) {
 				if (acquireLock && !locked) {
@@ -455,6 +465,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 
 				if (newSingleton) {
 					try {
+						// 将成品bean放入一级缓存中
 						addSingleton(beanName, singletonObject);
 					}
 					catch (IllegalStateException ex) {
@@ -658,6 +669,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 	public void registerDependentBean(String beanName, String dependentBeanName) {
 		String canonicalName = canonicalName(beanName);
 
+		// 表示 beanName 被 dependentBeanName 依赖，即 beanName 依赖于 dependentBeanName
+		// beanName是key，dependentBeanName是value
 		synchronized (this.dependentBeanMap) {
 			Set<String> dependentBeans =
 					this.dependentBeanMap.computeIfAbsent(canonicalName, key -> new LinkedHashSet<>(8));
@@ -666,6 +679,8 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			}
 		}
 
+		// 表示 dependentBeanName 依赖于 beanName，即 dependentBeanName 依赖于 canonicalName
+		// dependentBeanName是key，beanName是value
 		synchronized (this.dependenciesForBeanMap) {
 			Set<String> dependenciesForBean =
 					this.dependenciesForBeanMap.computeIfAbsent(dependentBeanName, key -> new LinkedHashSet<>(8));

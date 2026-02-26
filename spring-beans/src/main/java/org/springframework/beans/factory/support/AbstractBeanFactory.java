@@ -160,6 +160,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	/** Application startup metrics. */
 	private ApplicationStartup applicationStartup = ApplicationStartup.DEFAULT;
 
+	// 合并后的RootBeanDefinition放入这个缓存
 	/** Map from bean name to merged RootBeanDefinition. */
 	private final Map<String, RootBeanDefinition> mergedBeanDefinitions = new ConcurrentHashMap<>(256);
 
@@ -274,6 +275,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 
 		// 上面一轮拿不到bean实例或者args不为空
 		else {
+			// 如果当前正在创建bean，则说明我们正在处理一个循环依赖的bean
 			// Fail if we're already creating this bean instance:
 			// We're assumably within a circular reference.
 			if (isPrototypeCurrentlyInCreation(beanName)) {
@@ -314,16 +316,20 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 				RootBeanDefinition mbd = getMergedLocalBeanDefinition(beanName);
 				checkMergedBeanDefinition(mbd, beanName, args);
 
+				// 查看bean定义是否依赖其他bean，如果是，则先创建依赖的bean
 				// Guarantee initialization of beans that the current bean depends on.
 				String[] dependsOn = mbd.getDependsOn();
 				if (dependsOn != null) {
 					for (String dep : dependsOn) {
+						// 如果dependsOn定义依赖的bean反而依赖当前bean，则抛出异常
 						if (isDependent(beanName, dep)) {
 							throw new BeanCreationException(mbd.getResourceDescription(), beanName,
 									"Circular depends-on relationship between '" + beanName + "' and '" + dep + "'");
 						}
+						// 注册依赖关系
 						registerDependentBean(dep, beanName);
 						try {
+							// 先创建并拿到依赖的bean
 							getBean(dep);
 						}
 						catch (NoSuchBeanDefinitionException ex) {
@@ -344,8 +350,10 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 					}
 				}
 
+				// 如果是单例bean，则从单例缓存中获取bean实例，如果获取不到，则创建bean实例,并将bean放入缓存中
 				// Create bean instance.
 				if (mbd.isSingleton()) {
+					//
 					sharedInstance = getSingleton(beanName, () -> {
 						try {
 							return createBean(beanName, mbd, args);
@@ -358,9 +366,11 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 							throw ex;
 						}
 					});
+					// 抽丝剥茧，获取bean实例
 					beanInstance = getObjectForBeanInstance(sharedInstance, requiredType, name, beanName, mbd);
 				}
 
+				// 如果是原型bean，则每次创建一个bean实例
 				else if (mbd.isPrototype()) {
 					// It's a prototype -> create a new instance.
 					Object prototypeInstance = null;
@@ -374,6 +384,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 					beanInstance = getObjectForBeanInstance(prototypeInstance, requiredType, name, beanName, mbd);
 				}
 
+				// 既不是单例也不是原型，则先获取作用域，然后创建作用域的bean实例
 				else {
 					String scopeName = mbd.getScope();
 					if (!StringUtils.hasLength(scopeName)) {
@@ -384,6 +395,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 						throw new IllegalStateException("No Scope registered for scope name '" + scopeName + "'");
 					}
 					try {
+						// 这里生成的bean实例与原型bean实例一样
 						Object scopedInstance = scope.get(beanName, () -> {
 							beforePrototypeCreation(beanName);
 							try {
@@ -414,6 +426,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			}
 		}
 
+		// bean转为要求的Class类型
 		return adaptBeanInstance(name, beanInstance, requiredType);
 	}
 
@@ -1576,6 +1589,13 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 	}
 
 	/**
+	 * resolveBeanClass 的主要目的是根据给定的 RootBeanDefinition（合并后的 Bean 定义）解析出对应的 Java 类（Class<?>）。
+	 * 如果 Bean 定义中已经缓存了类信息，则直接返回；否则通过类加载器动态加载类，并将其缓存到 Bean 定义中以供后续使用。
+	 * @param 合并后的bean定义对象
+	 * @param beanName bean的名称（用于错误处理）
+	 * @param 用于内部类型匹配的候选类型数组。这些类型不会暴露给应用程序代码。
+	 */
+	/**
 	 * Resolve the bean class for the specified bean definition,
 	 * resolving a bean class name into a Class reference (if necessary)
 	 * and storing the resolved Class in the bean definition for further use.
@@ -1590,6 +1610,7 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 			throws CannotLoadBeanClassException {
 
 		try {
+			// 如果已经缓存了类信息，则直接返回，提高性能，避免重复解析
 			if (mbd.hasBeanClass()) {
 				return mbd.getBeanClass();
 			}
@@ -1611,9 +1632,17 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 		}
 	}
 
+	/**
+	 * 解析BeanClass信息的核心类，它会根据给定的RootBeanDefinition对象，尝试解析出对应的Java类。
+	 * @param mbd
+	 * @param typesToMatch
+	 * @return
+	 * @throws ClassNotFoundException
+	 */
 	private @Nullable Class<?> doResolveBeanClass(RootBeanDefinition mbd, Class<?>... typesToMatch)
 			throws ClassNotFoundException {
 
+		// 获取bean类加载器，默认是当前线程上下文类加载器
 		ClassLoader beanClassLoader = getBeanClassLoader();
 		ClassLoader dynamicLoader = beanClassLoader;
 		boolean freshResolve = false;
@@ -1959,6 +1988,10 @@ public abstract class AbstractBeanFactory extends FactoryBeanRegistrySupport imp
 						bean, getBeanPostProcessorCache().destructionAware))));
 	}
 
+	/**
+	 * 如果这个 bean 需要在容器关闭/销毁时执行清理逻辑，就把它注册到“可销毁 bean 列表”中，以便容器后续统一调用销毁回调。
+	 * 只针对非 prototype 作用域的 bean（主要是 singleton 和自定义 scope），prototype bean 每次 getBean 都新创建，不归容器管理销毁。
+	 */
 	/**
 	 * Add the given bean to the list of disposable beans in this factory,
 	 * registering its DisposableBean interface and/or the given destroy method

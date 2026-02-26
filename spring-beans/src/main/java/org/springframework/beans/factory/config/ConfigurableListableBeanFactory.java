@@ -198,6 +198,9 @@ public interface ConfigurableListableBeanFactory
 	}
 
 	/**
+	 * 实例化所有的非懒加载的bean实例，包括FactoryBean
+	 */
+	/**
 	 * Ensure that all non-lazy-init singletons are instantiated, also considering
 	 * {@link org.springframework.beans.factory.FactoryBean FactoryBeans}.
 	 * Typically invoked at the end of factory setup, if desired.

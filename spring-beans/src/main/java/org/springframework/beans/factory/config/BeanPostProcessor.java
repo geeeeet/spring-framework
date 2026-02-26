@@ -85,7 +85,13 @@ public interface BeanPostProcessor {
 	}
 
 	/**
-	 * 该方法是在bean初始化之后执行，也就是@PreDestroy注解的方法、在调用DisposableBean的destroy方法或者自定义的 destroy-method 销毁方法之后执行
+	 * 该方法是在bean初始化之后执行
+	 *
+	 * 它会在以下操作之后被调用：
+	 * @PostConstruct 注解标记的方法；
+	 * InitializingBean 接口的 afterPropertiesSet() 方法；
+	 * 自定义的 init-method 初始化方法。
+	 *
 	 * 该方法默认返回原始的bean或者被包装后的bean，当然这个bean的属性都是已经填充好了。
 	 */
 	/**

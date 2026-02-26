@@ -127,6 +127,7 @@ class DefaultListableBeanFactoryTests {
 		p.setProperty("x1.(class)", KnowsIfInstantiated.class.getName());
 		assertThat(KnowsIfInstantiated.wasInstantiated()).as("singleton not instantiated").isFalse();
 		registerBeanDefinitions(p);
+		assertThat(KnowsIfInstantiated.wasInstantiated()).as("singleton not instantiated").isFalse();
 		lbf.preInstantiateSingletons();
 		assertThat(KnowsIfInstantiated.wasInstantiated()).as("singleton was instantiated").isTrue();
 	}
@@ -158,10 +159,10 @@ class DefaultListableBeanFactoryTests {
 		registerBeanDefinitions(p);
 		assertThat(DummyFactory.wasPrototypeCreated()).as("prototype not instantiated").isFalse();
 		assertThat(lbf.getType("x1")).isEqualTo(TestBean.class);
-		lbf.preInstantiateSingletons();
+		lbf.preInstantiateSingletons(); // FactoryBean在预实例化是也不会创建prototype类型的bean
 
 		assertThat(DummyFactory.wasPrototypeCreated()).as("prototype not instantiated").isFalse();
-		lbf.getBean("x1");
+		lbf.getBean("x1"); // FactoryBean也是在获取bean的时候才创建的
 		assertThat(lbf.getType("x1")).isEqualTo(TestBean.class);
 		assertThat(lbf.containsBean("x1")).isTrue();
 		assertThat(lbf.containsBean("&x1")).isTrue();
