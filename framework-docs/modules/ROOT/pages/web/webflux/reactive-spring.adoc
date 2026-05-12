@@ -485,8 +485,8 @@ The `JacksonJsonEncoder` works as follows:
 * For a multi-value publisher with `application/json`, by default collect the values with
 `Flux#collectToList()` and then serialize the resulting collection.
 * For a multi-value publisher with a streaming media type such as
-`application/x-ndjson` or `application/stream+x-jackson-smile`, encode, write, and
-flush each value individually using a
+`application/jsonl`, `application/x-ndjson` or `application/stream+x-jackson-smile`,
+encode, write, and flush each value individually using a
 https://en.wikipedia.org/wiki/JSON_streaming[line-delimited JSON] format. Other
 streaming media types may be registered with the encoder.
 * For SSE the `JacksonJsonEncoder` is invoked per event and the output is flushed to ensure
@@ -598,7 +598,7 @@ To configure all three in WebFlux, you'll need to supply a pre-configured instan
 [.small]#xref:web/webmvc/mvc-ann-async.adoc#mvc-ann-async-http-streaming[See equivalent in the Servlet stack]#
 
 When streaming to the HTTP response (for example, `text/event-stream`,
-`application/x-ndjson`), it is important to send data periodically, in order to
+`application/jsonl`, `application/x-ndjson`), it is important to send data periodically, in order to
 reliably detect a disconnected client sooner rather than later. Such a send could be a
 comment-only, empty SSE event or any other "no-op" data that would effectively serve as
 a heartbeat.

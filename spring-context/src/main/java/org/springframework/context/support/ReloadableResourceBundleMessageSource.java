@@ -19,6 +19,7 @@ package org.springframework.context.support;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.Charset;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -59,9 +60,13 @@ import org.springframework.util.StringUtils;
  * are treated in a slightly different fashion than the "basenames" property of
  * {@link ResourceBundleMessageSource}. It follows the basic ResourceBundle rule of not
  * specifying file extension or language codes, but can refer to any Spring resource
- * location (instead of being restricted to classpath resources). With a "classpath:"
- * prefix, resources can still be loaded from the classpath, but "cacheSeconds" values
- * other than "-1" (caching forever) might not work reliably in this case.
+ * location (instead of being restricted to classpath resources).
+ *
+ * <p>With a "classpath:" prefix, resources can still be loaded from the classpath,
+ * but "cacheSeconds" values other than "-1" (caching forever) are not expected to
+ * be effective in this case. As of 7.1, a "classpath*:" prefix is accepted as well,
+ * loading all classpath resources of the same fully-qualified name: for example,
+ * "classpath*:/messages.properties" or "classpath*:META-INF/messages.properties".
  *
  * <p>For a typical web application, message files could be placed in {@code WEB-INF}:
  * for example, a "WEB-INF/messages" basename would find a "WEB-INF/messages.properties",
@@ -80,9 +85,10 @@ import org.springframework.util.StringUtils;
  *
  * @author Juergen Hoeller
  * @author Sebastien Deleuze
+ * @author Sam Brannen
  * @see #setCacheSeconds
  * @see #setBasenames
- * @see #setDefaultEncoding
+ * @see #setDefaultCharset
  * @see #setFileEncodings
  * @see #setPropertiesPersister
  * @see #setResourceLoader
@@ -93,10 +99,12 @@ import org.springframework.util.StringUtils;
 public class ReloadableResourceBundleMessageSource extends AbstractResourceBasedMessageSource
 		implements ResourceLoaderAware {
 
+	private static final String PROPERTIES_EXTENSION = ".properties";
+
 	private static final String XML_EXTENSION = ".xml";
 
 
-	private List<String> fileExtensions = List.of(".properties", XML_EXTENSION);
+	private List<String> fileExtensions = List.of(PROPERTIES_EXTENSION, XML_EXTENSION);
 
 	private @Nullable Properties fileEncodings;
 
@@ -135,7 +143,7 @@ public class ReloadableResourceBundleMessageSource extends AbstractResourceBased
 	/**
 	 * Set per-file charsets to use for parsing properties files.
 	 * <p>Only applies to classic properties files, not to XML files.
-	 * @param fileEncodings a Properties with filenames as keys and charset
+	 * @param fileEncodings a Properties object with filenames as keys and charset
 	 * names as values. Filenames have to match the basename syntax,
 	 * with optional locale-specific components: for example, "WEB-INF/messages"
 	 * or "WEB-INF/messages_en".
@@ -378,18 +386,18 @@ public class ReloadableResourceBundleMessageSource extends AbstractResourceBased
 		StringBuilder temp = new StringBuilder(basename);
 
 		temp.append('_');
-		if (language.length() > 0) {
+		if (!language.isEmpty()) {
 			temp.append(language);
 			result.add(0, temp.toString());
 		}
 
 		temp.append('_');
-		if (country.length() > 0) {
+		if (!country.isEmpty()) {
 			temp.append(country);
 			result.add(0, temp.toString());
 		}
 
-		if (variant.length() > 0 && (language.length() > 0 || country.length() > 0)) {
+		if (!variant.isEmpty() && (!language.isEmpty() || !country.isEmpty())) {
 			temp.append('_').append(variant);
 			result.add(0, temp.toString());
 		}
@@ -558,37 +566,40 @@ public class ReloadableResourceBundleMessageSource extends AbstractResourceBased
 	 */
 	protected Properties loadProperties(Resource resource, String filename) throws IOException {
 		Properties props = newProperties();
-		try (InputStream is = resource.getInputStream()) {
-			String resourceFilename = resource.getFilename();
+		String resourceFilename = resource.getFilename();
+		resource.consumeContent(inputStream -> {
 			if (resourceFilename != null && resourceFilename.endsWith(XML_EXTENSION)) {
 				if (logger.isDebugEnabled()) {
 					logger.debug("Loading properties [" + resource.getFilename() + "]");
 				}
-				this.propertiesPersister.loadFromXml(props, is);
+				this.propertiesPersister.loadFromXml(props, inputStream);
 			}
 			else {
-				String encoding = null;
+				Charset charset = null;
 				if (this.fileEncodings != null) {
-					encoding = this.fileEncodings.getProperty(filename);
-				}
-				if (encoding == null) {
-					encoding = getDefaultEncoding();
-				}
-				if (encoding != null) {
-					if (logger.isDebugEnabled()) {
-						logger.debug("Loading properties [" + resource.getFilename() + "] with encoding '" + encoding + "'");
+					String charsetName = this.fileEncodings.getProperty(filename);
+					if (charsetName != null) {
+						charset = Charset.forName(charsetName);
 					}
-					this.propertiesPersister.load(props, new InputStreamReader(is, encoding));
+				}
+				if (charset == null) {
+					charset = getDefaultCharset();
+				}
+				if (charset != null) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Loading properties [" + resource.getFilename() + "] with encoding '" + charset + "'");
+					}
+					this.propertiesPersister.load(props, new InputStreamReader(inputStream, charset));
 				}
 				else {
 					if (logger.isDebugEnabled()) {
 						logger.debug("Loading properties [" + resource.getFilename() + "]");
 					}
-					this.propertiesPersister.load(props, is);
+					this.propertiesPersister.load(props, inputStream);
 				}
 			}
-			return props;
-		}
+		});
+		return props;
 	}
 
 	/**

@@ -146,14 +146,20 @@ public class AnnotationConfigApplicationContext extends GenericApplicationContex
 	// 该方法必须在调用register或者scan方法之前调用
 	/**
 	 * Provide a custom {@link BeanNameGenerator} for use with {@link AnnotatedBeanDefinitionReader}
-	 * and/or {@link ClassPathBeanDefinitionScanner}, if any.
-	 * <p>Default is {@link AnnotationBeanNameGenerator}.
+	 * and/or {@link ClassPathBeanDefinitionScanner}.
+	 * <p>Default is {@code AnnotationBeanNameGenerator}.
+	 * <p>When processing {@link Configuration @Configuration} classes, a
+	 * {@link ConfigurationBeanNameGenerator} (such as
+	 * {@link FullyQualifiedConfigurationBeanNameGenerator}) also determines the
+	 * default names for {@link Bean @Bean} methods without an explicit {@code name}
+	 * attribute.
 	 * <p>Any call to this method must occur prior to calls to {@link #register(Class...)}
 	 * and/or {@link #scan(String...)}.
 	 * @see AnnotatedBeanDefinitionReader#setBeanNameGenerator
 	 * @see ClassPathBeanDefinitionScanner#setBeanNameGenerator
 	 * @see AnnotationBeanNameGenerator
 	 * @see FullyQualifiedAnnotationBeanNameGenerator
+	 * @see FullyQualifiedConfigurationBeanNameGenerator
 	 */
 	public void setBeanNameGenerator(BeanNameGenerator beanNameGenerator) {
 		this.reader.setBeanNameGenerator(beanNameGenerator);

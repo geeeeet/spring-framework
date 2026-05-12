@@ -97,6 +97,8 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 
 	private ServerRequestObservationConvention observationConvention = DEFAULT_OBSERVATION_CONVENTION;
 
+	private @Nullable Boolean defaultHtmlEscape;
+
 	private @Nullable ApplicationContext applicationContext;
 
 	/** Whether to log potentially sensitive info (form data at DEBUG, headers at TRACE). */
@@ -232,6 +234,26 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	}
 
 	/**
+	 * Configure whether default HTML escaping is enabled for the web application.
+	 * The setting is then exposed as the exchanger attribute
+	 * {@link ServerWebExchange#HTML_ESCAPE_ATTRIBUTE}.
+	 * @param defaultHtmlEscape whether to enable default HTML escaping
+	 * @since 7.0.6
+	 */
+	public void setDefaultHtmlEscape(Boolean defaultHtmlEscape) {
+		this.defaultHtmlEscape = defaultHtmlEscape;
+	}
+
+	/**
+	 * Return the configured default HTML escape setting,
+	 * or {@code null} if not configured.
+	 * @since 7.0.6
+	 */
+	public @Nullable Boolean getDefaultHtmlEscape() {
+		return this.defaultHtmlEscape;
+	}
+
+	/**
 	 * Configure the {@code ApplicationContext} associated with the web application,
 	 * if it was initialized with one via
 	 * {@link org.springframework.web.server.adapter.WebHttpHandlerBuilder#applicationContext(ApplicationContext)}.
@@ -249,6 +271,7 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 	public @Nullable ApplicationContext getApplicationContext() {
 		return this.applicationContext;
 	}
+
 
 	/**
 	 * This method must be invoked after all properties have been set to
@@ -289,6 +312,10 @@ public class HttpWebHandlerAdapter extends WebHandlerDecorator implements HttpHa
 				exchange.getRequest(), exchange.getResponse(), exchange.getAttributes());
 		exchange.getAttributes().put(
 				ServerRequestObservationContext.CURRENT_OBSERVATION_CONTEXT_ATTRIBUTE, observationContext);
+
+		if (this.defaultHtmlEscape != null) {
+			exchange.getAttributes().put(ServerWebExchange.HTML_ESCAPE_ATTRIBUTE, this.defaultHtmlEscape);
+		}
 
 		return getDelegate().handle(exchange)
 				.doOnSuccess(aVoid -> logResponse(exchange))
