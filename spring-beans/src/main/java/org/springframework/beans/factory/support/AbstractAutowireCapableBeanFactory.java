@@ -1228,12 +1228,12 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		if (args == null) {
 			Supplier<?> instanceSupplier = mbd.getInstanceSupplier();
 			if (instanceSupplier != null) {
-				// 使用自定义的创建bean的方法创建bean并返回
+				// 第一种：使用自定义的创建bean的方法创建bean并返回
 				return obtainFromSupplier(instanceSupplier, beanName, mbd);
 			}
 		}
 
-		// 使用RootBeanDefinition定义指定的工厂方法创建bean实例
+		// 第二种：使用RootBeanDefinition定义指定的工厂方法创建bean实例
 		if (mbd.getFactoryMethodName() != null) {
 			return instantiateUsingFactoryMethod(beanName, mbd, args);
 		}
@@ -1252,9 +1252,11 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		}
 		if (resolved) {
 			if (autowireNecessary) {
+				//第三种：构造器参数自动解析 + 注入（byType/byName）
 				return autowireConstructor(beanName, mbd, null, null);
 			}
 			else {
+				// 第四种：反射调用无参构造器
 				return instantiateBean(beanName, mbd);
 			}
 		}
@@ -1409,7 +1411,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	}
 
 	/**
-	 *
+	 * autowireConstructor() 是 Spring 中处理构造器自动注入（包括 @Autowired 构造器、autowire="constructor"、显式 <constructor-arg> 等）的核心方法。
 	 */
 	/**
 	 * "autowire constructor" (with constructor arguments by type) behavior.
@@ -1472,6 +1474,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			}
 		}
 
+		// 它负责处理 XML 配置中 autowire="byName" 或 autowire="byType" 的自动注入逻辑（即老式的 XML autowiring 模式）。
 		PropertyValues pvs = (mbd.hasPropertyValues() ? mbd.getPropertyValues() : null);
 
 		int resolvedAutowireMode = mbd.getResolvedAutowireMode();
@@ -1487,6 +1490,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 			}
 			pvs = newPvs;
 		}
+
 		if (hasInstantiationAwareBeanPostProcessors()) {
 			if (pvs == null) {
 				pvs = mbd.getPropertyValues();

@@ -734,6 +734,11 @@ class ConstructorResolver {
 	}
 
 	/**
+	 * 1、决定最终要调用的构造器
+	 * 2、为每个构造器参数生成实际的值（resolveDependency）
+	 * 3、处理 @Qualifier、@Primary、Optional、@Nullable 等修饰
+	 */
+	/**
 	 * Create an array of arguments to invoke a constructor or factory method,
 	 * given the resolved constructor argument values.
 	 */
@@ -808,6 +813,7 @@ class ConstructorResolver {
 				try {
 					ConstructorDependencyDescriptor desc = new ConstructorDependencyDescriptor(methodParam, true);
 					Set<String> autowiredBeanNames = new LinkedHashSet<>(2);
+					// 真正执行依赖查找的地方
 					Object arg = resolveAutowiredArgument(
 							desc, paramType, beanName, autowiredBeanNames, converter, fallback);
 					if (arg != null) {

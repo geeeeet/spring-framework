@@ -312,6 +312,20 @@ public abstract class AbstractAutoProxyCreator extends ProxyProcessorSupport
 	}
 
 	/**
+	 * 这是 Spring AOP 自动代理机制中 最核心、最关键的一个方法，几乎所有基于代理的 AOP（包括 @Aspect
+	 * 、@Transactional
+	 * 、@Cacheable
+	 *  等）都会经过这里来决定“这个 bean 要不要被代理”。
+	 *
+	 *  作用：
+	 * 检查当前 bean 是否需要被 AOP 代理（即是否需要生成代理对象）。
+	 *   如果需要 → 返回代理对象
+	 *   如果不需要 → 返回原始 bean 对象
+	 *
+	 * 这个方法在 BeanPostProcessor 的 postProcessBeforeInstantiation 或 postProcessAfterInitialization 阶段被调用（主要是前者）。
+	 *
+	 */
+	/**
 	 * Wrap the given bean if necessary, i.e. if it is eligible for being proxied.
 	 * @param bean the raw bean instance
 	 * @param beanName the name of the bean

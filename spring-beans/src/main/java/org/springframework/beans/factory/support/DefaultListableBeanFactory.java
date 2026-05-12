@@ -1163,7 +1163,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 	}
 
 	/**
-	 *
+	 * 实例化bean的方法，非常重要的方法
 	 * @param beanName
 	 * @param mbd
 	 * @return
@@ -1686,6 +1686,17 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		return new NamedBeanHolder<>(beanName, adaptBeanInstance(beanName, bean, requiredType.toClass()));
 	}
 
+	/**
+	 * 解析依赖
+	 *
+	 * @param descriptor the descriptor for the dependency (field/method/constructor)
+	 * @param requestingBeanName the name of the bean which declares the given dependency
+	 * @param autowiredBeanNames a Set that all names of autowired beans (used for
+	 * resolving the given dependency) are supposed to be added to
+	 * @param typeConverter the TypeConverter to use for populating arrays and collections
+	 * @return
+	 * @throws BeansException
+	 */
 	@Override
 	public @Nullable Object resolveDependency(DependencyDescriptor descriptor, @Nullable String requestingBeanName,
 			@Nullable Set<String> autowiredBeanNames, @Nullable TypeConverter typeConverter) throws BeansException {
@@ -1711,12 +1722,28 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 		return doResolveDependency(descriptor, requestingBeanName, autowiredBeanNames, typeConverter);
 	}
 
+	/**
+	 * doResolveDependency(...) 是 Spring 中依赖解析的最核心方法（位于 DefaultListableBeanFactory），
+	 * 几乎所有注入方式（@Autowired、@Value、构造器参数、setter、字段、@Resource 等）最终都会走到这里来查找并返回依赖实例。
+	 *
+	 * 方法整体职责（一句话）
+	 * 根据 DependencyDescriptor（描述了需要注入什么类型、注解、位置等），
+	 * 在容器中找到最合适的 bean 实例（或集合、Optional、空值），并返回它。如果找不到且 required → 抛异常。
+	 *
+	 * @param descriptor
+	 * @param beanName
+	 * @param autowiredBeanNames
+	 * @param typeConverter
+	 * @return
+	 * @throws BeansException
+	 */
 	@SuppressWarnings("NullAway")  // Dataflow analysis limitation
 	public @Nullable Object doResolveDependency(DependencyDescriptor descriptor, @Nullable String beanName,
 			@Nullable Set<String> autowiredBeanNames, @Nullable TypeConverter typeConverter) throws BeansException {
 
 		InjectionPoint previousInjectionPoint = ConstructorResolver.setCurrentInjectionPoint(descriptor);
 		try {
+			// 先查缓存，缓存中存储了依赖的bean实例，如果有则直接返回
 			// Step 1: pre-resolved shortcut for single bean match, for example, from @Autowired
 			Object shortcut = descriptor.resolveShortcut(this);
 			if (shortcut != null) {
@@ -1725,6 +1752,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 
 			Class<?> type = descriptor.getDependencyType();
 
+			// 参数/字段上有 @Value("${...}") 或 SpEL,解析后的值（String、int、Properties 等）
 			// Step 2: pre-defined value or expression, for example, from @Value
 			Object value = getAutowireCandidateResolver().getSuggestedValue(descriptor);
 			if (value != null) {
@@ -1746,6 +1774,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 
+			// @Qualifier 或 suggestedName 精确 beanName 匹配,有 @Qualifier("myBean") 或参数名匹配 beanName
 			// Step 3: shortcut for declared dependency name or qualifier-suggested name matching target bean name
 			if (descriptor.usesStandardBeanLookup()) {
 				String dependencyName = descriptor.getDependencyName();
@@ -1767,6 +1796,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 				}
 			}
 
+			// 集合/数组/Map 类型（Stream、List、Set、Map<String, T> 等）,注入 List<Plugin>、@Autowired Map<String, DataSource>
 			// Step 4a: multiple beans as stream / array / standard collection / plain map
 			Object multipleBeans = resolveMultipleBeans(descriptor, beanName, autowiredBeanNames, typeConverter);
 			if (multipleBeans != null) {
@@ -1790,6 +1820,7 @@ public class DefaultListableBeanFactory extends AbstractAutowireCapableBeanFacto
 			String autowiredBeanName;
 			Object instanceCandidate;
 
+			// 从多个候选 bean 中选一个（determineAutowireCandidate）
 			// Step 5: determine single candidate
 			if (matchingBeans.size() > 1) {
 				autowiredBeanName = determineAutowireCandidate(matchingBeans, descriptor);
