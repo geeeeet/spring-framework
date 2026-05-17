@@ -55,15 +55,17 @@ public class DefaultAopProxyFactory implements AopProxyFactory, Serializable {
 
 	private static final long serialVersionUID = 7930414337282325166L;
 
-
 	@Override
 	public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException {
+		// 一般情况下，@EnableAspectJAutoProxy(proxyTargetClass = true) proxyTargetClass = true、optimize = true、没有用户提供的接口 (!hasUserSuppliedInterfaces())、创建 CGLIB 代理
+		// 注意  Serializable 这种接口默认视为无效接口，不会被认为是用户提供的接口，还是倾向CGLIB 代理
 		if (config.isOptimize() || config.isProxyTargetClass() || !config.hasUserSuppliedInterfaces()) {
 			Class<?> targetClass = config.getTargetClass();
 			if (targetClass == null && config.getProxiedInterfaces().length == 0) {
 				throw new AopConfigException("TargetSource cannot determine target class: " +
 						"Either an interface or a target is required for proxy creation.");
 			}
+			// 特殊情况，目标类本身是接口、目标已经是 JDK 代理对象（防止重复代理）、目标类是Lambda 类，这些情况使用JDK代理
 			if (targetClass == null || targetClass.isInterface() ||
 					Proxy.isProxyClass(targetClass) || ClassUtils.isLambdaClass(targetClass)) {
 				// JDK 动态代理

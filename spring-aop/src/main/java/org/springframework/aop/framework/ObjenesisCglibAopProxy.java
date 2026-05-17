@@ -59,9 +59,11 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 
 	@Override
 	protected Object createProxyClassAndInstance(Enhancer enhancer, Callback[] callbacks) {
+		// 第一步：生成代理 Class（Enhancer 帮我们生成子类字节码）
 		Class<?> proxyClass = enhancer.createClass();
 		Object proxyInstance = null;
 
+		// 第二步：尝试使用 Objenesis（推荐方式）,先判断是否值得尝试不使用构造函数创建对象
 		if (objenesis.isWorthTrying()) {
 			try {
 				proxyInstance = objenesis.newInstance(proxyClass, enhancer.getUseCache());
@@ -72,13 +74,15 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 			}
 		}
 
+		// 第三步：Objenesis 失败后的回退方案
 		if (proxyInstance == null) {
 			// Regular instantiation via default constructor...
 			try {
+				// 普通反射方式创建对象
 				Constructor<?> ctor = (this.constructorArgs != null ?
 						proxyClass.getDeclaredConstructor(this.constructorArgTypes) :
 						proxyClass.getDeclaredConstructor());
-				ReflectionUtils.makeAccessible(ctor);
+				ReflectionUtils.makeAccessible(ctor); // 强制设置权限可访问
 				proxyInstance = (this.constructorArgs != null ?
 						ctor.newInstance(this.constructorArgs) : ctor.newInstance());
 			}
@@ -88,6 +92,7 @@ class ObjenesisCglibAopProxy extends CglibAopProxy {
 			}
 		}
 
+		// 第四步：给代理对象设置 Callback（拦截逻辑）
 		((Factory) proxyInstance).setCallbacks(callbacks);
 		return proxyInstance;
 	}

@@ -81,9 +81,19 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 	/** We use a static Log to avoid serialization issues. */
 	private static final Log logger = LogFactory.getLog(JdkDynamicAopProxy.class);
 
+	/**
+	 * 第一个重要成员变量
+	 * AOP 配置的大管家。里面装着：你写的切面、通知（@Before、@After等）
+	 * 目标对象（真正干活的那个对象）
+	 * 要不要暴露代理等配置
+	 */
 	/** Config used to configure this proxy. */
 	private final AdvisedSupport advised;
 
+	/**
+	 * 第二个重要成员变量
+	 * 一个缓存，存着“需要代理哪些接口”、“equals 和 hashCode 方法有没有在接口里定义过”等信息，避免每次都重复计算，性能更好。
+	 */
 	/** Cached in {@link AdvisedSupport#proxyMetadataCache}. */
 	private transient ProxiedInterfacesCache cache;
 
@@ -111,6 +121,11 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 	}
 
 
+	/**
+	 * 创建代理对象的方法
+	 *
+	 * @return
+	 */
 	@Override
 	public Object getProxy() {
 		return getProxy(ClassUtils.getDefaultClassLoader());
@@ -158,6 +173,9 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 
 
 	/**
+	 * 代理里面最重要的方法，所有对代理对象的方法调用都会被这个方法拦截到。
+	 */
+	/**
 	 * Implementation of {@code InvocationHandler.invoke}.
 	 * <p>Callers will see exactly the exception thrown by the target,
 	 * unless a hook method throws an exception.
@@ -171,6 +189,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 		Object target = null;
 
 		try {
+			// 阶段1：特殊方法快速处理。避免代理对象和目标对象 equals()、hashCode() 不一致导致的问题，同时支持 ((Advised) proxy).getAdvisors() 等操作。
 			if (!this.cache.equalsDefined && AopUtils.isEqualsMethod(method)) {
 				// The target does not implement the equals(Object) method itself.
 				return equals(args[0]);
@@ -191,12 +210,14 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 
 			Object retVal;
 
+			// 阶段2：这是解决内部自调用（this.method() 不走 AOP）的关键机制。开启后可在目标方法中通过 AopContext.currentProxy() 获取当前代理对象。
 			if (this.advised.isExposeProxy()) {
 				// Make invocation available if necessary.
 				oldProxy = AopContext.setCurrentProxy(proxy);
 				setProxyContext = true;
 			}
 
+			// 阶段 3：获取目标对象 + 拦截器链
 			// Get as late as possible to minimize the time we "own" the target,
 			// in case it comes from a pool.
 			target = targetSource.getTarget();
@@ -205,9 +226,11 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 			// Get the interception chain for this method.
 			List<Object> chain = this.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);
 
+			// 阶段 4：真正执行
 			// Check whether we have any advice. If we don't, we can fall back on direct
 			// reflective invocation of the target, and avoid creating a MethodInvocation.
 			if (chain.isEmpty()) {
+				// 没有通知 → 直接反射调用（最高性能）
 				// We can skip creating a MethodInvocation: just invoke the target directly
 				// Note that the final invoker must be an InvokerInterceptor so we know it does
 				// nothing but a reflective operation on the target, and no hot swapping or fancy proxying.
@@ -215,6 +238,7 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 				retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);
 			}
 			else {
+				// 有通知 → 责任链模式
 				// We need to create a method invocation...
 				MethodInvocation invocation =
 						new ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);
@@ -222,6 +246,8 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 				retVal = invocation.proceed();
 			}
 
+			//阶段 5：返回值特殊处理
+			// 如果目标方法返回 this，则返回代理对象（保持一致性）
 			// Massage return value if necessary.
 			Class<?> returnType = method.getReturnType();
 			if (retVal != null && retVal == target &&
@@ -232,10 +258,13 @@ final class JdkDynamicAopProxy implements AopProxy, InvocationHandler, Serializa
 				// a reference to itself in another returned object.
 				retVal = proxy;
 			}
+			// 基本类型返回 null 时抛出异常（符合 Java 语义）
 			else if (retVal == null && returnType != void.class && returnType.isPrimitive()) {
 				throw new AopInvocationException(
 						"Null return value from advice does not match primitive return type for: " + method);
 			}
+
+			// 阶段 6：Kotlin 协程支持（Spring 6+ 新增）
 			if (COROUTINES_REACTOR_PRESENT && KotlinDetector.isSuspendingFunction(method)) {
 				return COROUTINES_FLOW_CLASS_NAME.equals(new MethodParameter(method, -1).getParameterType().getName()) ?
 						CoroutinesUtils.asFlow(retVal) : CoroutinesUtils.awaitSingleOrNull(retVal, args[args.length - 1]);

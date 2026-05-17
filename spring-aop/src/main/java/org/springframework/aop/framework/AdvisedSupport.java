@@ -47,6 +47,7 @@ import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 
 /**
+ * AOP动态代理的基础配置管理类
  * Base class for AOP proxy configuration managers.
  *
  * <p>These are not themselves AOP proxies, but subclasses of this class are
