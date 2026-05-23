@@ -362,6 +362,9 @@ public abstract class AbstractPlatformTransactionManager
 	//---------------------------------------------------------------------
 
 	/**
+	 * 这个方法根据Propagation参数来决定如何处理事务。
+	 */
+	/**
 	 * This implementation handles propagation behavior. Delegates to
 	 * {@code doGetTransaction}, {@code isExistingTransaction}
 	 * and {@code doBegin}.

@@ -333,11 +333,14 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 	protected @Nullable Object invokeWithinTransaction(Method method, @Nullable Class<?> targetClass,
 			final InvocationCallback invocation) throws Throwable {
 
+		// 1. 获取事务属性源（解析出 @Transactional 里的 propagation, isolation, timeout 等参数）
 		// If the transaction attribute is null, the method is non-transactional.
 		TransactionAttributeSource tas = getTransactionAttributeSource();
 		final TransactionAttribute txAttr = (tas != null ? tas.getTransactionAttribute(method, targetClass) : null);
+		// 2. 寻找合适的事务管理器（TransactionManager，如 DataSourceTransactionManager）
 		final TransactionManager tm = determineTransactionManager(txAttr, targetClass);
 
+		// --------- 【分支一：响应式/异步事务（Reactive）】 ---------
 		if (this.reactiveAdapterRegistry != null && tm instanceof ReactiveTransactionManager rtm) {
 			boolean isSuspendingFunction = KotlinDetector.isSuspendingFunction(method);
 			boolean hasSuspendingFlowReturnType = isSuspendingFunction &&
@@ -357,25 +360,32 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 			return txSupport.invokeWithinTransaction(method, targetClass, invocation, txAttr, rtm);
 		}
 
+		// --------- 【分支二：传统的命令式事务（Imperative，最常见）】 ---------
 		PlatformTransactionManager ptm = asPlatformTransactionManager(tm);
 		final String joinpointIdentification = methodIdentification(method, targetClass, txAttr);
 
 		if (txAttr == null || !(ptm instanceof CallbackPreferringPlatformTransactionManager cpptm)) {
 			// Standard transaction demarcation with getTransaction and commit/rollback calls.
+			// 【核心控制点 A】：创建并开启事务
+			// 内部会调用 ptm.getTransaction(txAttr)，处理传播行为（如 REQUIRED、REQUIRES_NEW）
+			// 并将事务状态信息封装进 TransactionInfo
 			TransactionInfo txInfo = createTransactionIfNecessary(ptm, txAttr, joinpointIdentification);
 
 			Object retVal;
 			try {
 				// This is an around advice: Invoke the next interceptor in the chain.
 				// This will normally result in a target object being invoked.
+				// 【核心控制点 B】：执行拦截器链中的下一个拦截器，最终到达业务目标方法
 				retVal = invocation.proceedWithInvocation();
 			}
 			catch (Throwable ex) {
 				// target invocation exception
+				// 【核心控制点 C】：如果目标方法抛出异常，触发异常处理（判断是否需要回滚）
 				completeTransactionAfterThrowing(txInfo, invocation, ex);
 				throw ex;
 			}
 			finally {
+				// 【核心控制点 D】：清理事务上下文（将旧的 TransactionInfo 恢复到 ThreadLocal）
 				cleanupTransactionInfo(txInfo);
 			}
 
@@ -405,11 +415,14 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				}
 			}
 
+			// 【核心控制点 E】：目标方法正常执行完毕，提交事务
 			commitTransactionAfterReturning(txInfo);
 			return retVal;
 		}
 
+		// --------- 【分支三：CallbackPreferringTransactionManager】 ---------
 		else {
+			// 针对诸如 WebSphere 等特殊应用服务器自带事务管理器的回调式处理
 			Object result;
 			final ThrowableHolder throwableHolder = new ThrowableHolder();
 
@@ -596,6 +609,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 		return null;
 	}
 
+	// 该方法很重要，就是创建一个事务，根据TransactionAttribute参数来判断是否需要创建事务。
 	/**
 	 * Create a transaction if necessary based on the given TransactionAttribute.
 	 * <p>Allows callers to perform custom TransactionAttribute lookups through
@@ -702,9 +716,11 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				logger.trace("Completing transaction for [" + txInfo.getJoinpointIdentification() +
 						"] after exception: " + ex);
 			}
+			// 判断当前抛出的异常是否符合回滚规则
 			if (txInfo.transactionAttribute != null && txInfo.transactionAttribute.rollbackOn(ex)) {
 				invocation.onRollback(ex, txInfo.getTransactionStatus());
 				try {
+					// 符合条件，利用事务管理器执行回滚
 					txInfo.getTransactionManager().rollback(txInfo.getTransactionStatus());
 				}
 				catch (TransactionSystemException ex2) {
@@ -720,6 +736,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 			else {
 				// We don't roll back on this exception.
 				// Will still roll back if TransactionStatus.isRollbackOnly() is true.
+				// 如果不符合回滚条件（比如配了不回滚某异常），依然选择提交！
 				try {
 					txInfo.getTransactionManager().commit(txInfo.getTransactionStatus());
 				}
